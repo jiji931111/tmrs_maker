@@ -93,26 +93,62 @@ def index():
     return render_template('index.html')
 
 
+def parse_xlsx(file_bytes):
+    """Parse .xlsx file using openpyxl"""
+    buf = io.BytesIO(file_bytes)
+    wb = openpyxl.load_workbook(buf, read_only=True, data_only=True)
+    ws = wb.active
+    data = []
+    for row in ws.iter_rows(min_row=1, max_col=2, values_only=True):
+        raw = str(row[0]).strip() if row[0] is not None else ""
+        nm = str(row[1]).strip() if row[1] is not None else ""
+        if raw and len(raw) < 3 and all(c in '0123456789ABCDEFabcdef' for c in raw):
+            raw = raw.zfill(3)
+        if is_valid_hex(raw):
+            data.append({"code": raw.upper(), "name": nm})
+    wb.close()
+    return data
+
+
+def parse_xls(file_bytes):
+    """Parse .xls (Excel 97-2003) file using xlrd"""
+    import xlrd
+    wb = xlrd.open_workbook(file_contents=file_bytes)
+    ws = wb.sheet_by_index(0)
+    data = []
+    for r in range(ws.nrows):
+        raw = str(ws.cell_value(r, 0)).strip() if ws.ncols > 0 else ""
+        nm = str(ws.cell_value(r, 1)).strip() if ws.ncols > 1 else ""
+        # xlrd may read numbers as float (e.g. 1.0 -> "1.0")
+        if '.' in raw:
+            raw = raw.split('.')[0]
+        if raw and len(raw) < 3 and all(c in '0123456789ABCDEFabcdef' for c in raw):
+            raw = raw.zfill(3)
+        if is_valid_hex(raw):
+            data.append({"code": raw.upper(), "name": nm})
+    return data
+
+
 @app.route('/api/upload', methods=['POST'])
 def upload():
     if 'file' not in request.files:
         return jsonify(error="파일이 없습니다"), 400
     f = request.files['file']
-    if not (f.filename or '').lower().endswith(('.xlsx', '.xls')):
-        return jsonify(error="엑셀 파일(.xlsx)만 지원합니다"), 400
+    filename = (f.filename or '').lower()
+    if not filename.endswith(('.xlsx', '.xls')):
+        return jsonify(error="엑셀 파일(.xlsx, .xls)만 지원합니다"), 400
 
     try:
-        wb = openpyxl.load_workbook(f, read_only=True, data_only=True)
-        ws = wb.active
-        data = []
-        for row in ws.iter_rows(min_row=1, max_col=2, values_only=True):
-            raw = str(row[0]).strip() if row[0] is not None else ""
-            nm = str(row[1]).strip() if row[1] is not None else ""
-            if raw and len(raw) < 3 and all(c in '0123456789ABCDEFabcdef' for c in raw):
-                raw = raw.zfill(3)
-            if is_valid_hex(raw):
-                data.append({"code": raw.upper(), "name": nm})
-        wb.close()
+        file_bytes = f.read()
+
+        if filename.endswith('.xls') and not filename.endswith('.xlsx'):
+            try:
+                data = parse_xls(file_bytes)
+            except ImportError:
+                return jsonify(error=".xls 파일을 읽으려면 xlrd가 필요합니다. pip install xlrd 를 실행해주세요."), 400
+        else:
+            data = parse_xlsx(file_bytes)
+
         return jsonify(filename=f.filename, total=len(data), preview=data[:30], data=data)
     except Exception as e:
         return jsonify(error=f"파일 처리 오류: {e}"), 400
