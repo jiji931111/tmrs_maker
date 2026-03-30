@@ -30,6 +30,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function bindEvents() {
+    // Input mode tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchInputMode(btn.dataset.mode));
+    });
+
     // Upload
     dropzone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleUpload(e.target.files[0]); });
@@ -40,6 +45,10 @@ function bindEvents() {
         if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]);
     });
     $('#clearFileBtn').addEventListener('click', clearUpload);
+
+    // Paste
+    $('#parsePasteBtn').addEventListener('click', handlePaste);
+    $('#clearPasteBtn').addEventListener('click', () => { $('#pasteInput').value = ''; clearUpload(); });
 
     // Templates
     $('#addTemplateBtn').addEventListener('click', () => openEditor(null));
@@ -64,6 +73,70 @@ function bindEvents() {
     // Generate
     $('#previewBtn').addEventListener('click', doPreview);
     $('#generateBtn').addEventListener('click', doGenerate);
+}
+
+// ── Input Mode Switching ─────────────────────────────────────────
+function switchInputMode(mode) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    if (mode === 'paste') {
+        $('#tabPaste').classList.add('active');
+        $('#fileMode').style.display = 'none';
+        $('#pasteMode').style.display = '';
+    } else {
+        $('#tabFile').classList.add('active');
+        $('#fileMode').style.display = '';
+        $('#pasteMode').style.display = 'none';
+    }
+}
+
+// ── Paste Parsing ────────────────────────────────────────────────
+function handlePaste() {
+    const raw = $('#pasteInput').value.trim();
+    if (!raw) { toast('붙여넣기 데이터가 없습니다', 'error'); return; }
+
+    const lines = raw.split(/\r?\n/).filter(l => l.trim());
+    const data = [];
+    const isHex = s => s && s.length === 3 && /^[0-9A-Fa-f]{3}$/.test(s);
+
+    for (const line of lines) {
+        // Tab or multiple spaces as delimiter
+        const parts = line.split(/\t|\s{2,}/);
+        let code = (parts[0] || '').trim();
+        const name = (parts[1] || '').trim();
+
+        // Pad short hex codes
+        if (code && code.length < 3 && /^[0-9A-Fa-f]+$/.test(code)) {
+            code = code.padStart(3, '0');
+        }
+        if (isHex(code)) {
+            data.push({ code: code.toUpperCase(), name });
+        }
+    }
+
+    if (data.length === 0) {
+        toast('유효한 HEX 코드를 찾지 못했습니다. A열: 3자리 HEX, B열: 이름 형태로 붙여넣어주세요.', 'error');
+        return;
+    }
+
+    state.uploadedData = {
+        filename: 'pasted_data',
+        total: data.length,
+        preview: data.slice(0, 30),
+        data: data,
+    };
+
+    // Show preview (reuse same function but hide file info)
+    uploadInfo.style.display = 'none';
+    const tbody = $('#previewBody');
+    tbody.innerHTML = data.slice(0, 30).map((r, i) =>
+        `<tr><td>${i + 1}</td><td class="code-cell">${esc(r.code)}</td><td>${esc(r.name)}</td></tr>`
+    ).join('');
+    $('#previewHint').textContent = data.length > 30 ? `(${data.length}건 중 30건)` : `(${data.length}건)`;
+    dataPreview.style.display = '';
+
+    toast(`${data.length}개 코드 파싱 완료`, 'success');
+    setStatus('데이터 준비됨');
+    updateButtons();
 }
 
 // ── Toast ────────────────────────────────────────────────────────

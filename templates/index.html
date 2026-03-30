@@ -27,36 +27,61 @@
     </header>
 
     <main class="app-main">
-        <!-- STEP 1: Upload -->
+        <!-- STEP 1: Upload / Paste -->
         <section class="card" id="uploadSection">
             <div class="card-header">
                 <span class="step-badge">1</span>
-                <h2>엑셀 파일 업로드</h2>
+                <h2>데이터 입력</h2>
             </div>
-            <div class="card-body upload-layout">
-                <div class="upload-left">
-                    <div class="dropzone" id="dropzone">
-                        <div class="dropzone-content">
-                            <div class="dropzone-icon">📂</div>
-                            <p class="dropzone-text">엑셀 파일을 드래그하거나 클릭</p>
-                            <p class="dropzone-hint">.xlsx 지원 · A열: HEX 코드 · B열: 이름</p>
-                        </div>
-                        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
-                    </div>
-                    <div class="upload-info" id="uploadInfo" style="display:none">
-                        <span class="file-icon">📄</span>
-                        <span id="fileName"></span>
-                        <span class="badge" id="fileCount"></span>
-                        <button class="btn btn-xs btn-ghost" id="clearFileBtn" title="제거">✕</button>
-                    </div>
+            <div class="card-body">
+                <!-- Input mode tabs -->
+                <div class="input-tabs">
+                    <button class="tab-btn active" id="tabFile" data-mode="file">📂 파일 업로드</button>
+                    <button class="tab-btn" id="tabPaste" data-mode="paste">📋 붙여넣기</button>
                 </div>
-                <div class="upload-right" id="dataPreview" style="display:none">
-                    <h3>미리보기 <small id="previewHint"></small></h3>
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>#</th><th>HEX</th><th>이름</th></tr></thead>
-                            <tbody id="previewBody"></tbody>
-                        </table>
+
+                <div class="upload-layout">
+                    <!-- File upload mode -->
+                    <div class="upload-left" id="fileMode">
+                        <div class="dropzone" id="dropzone">
+                            <div class="dropzone-content">
+                                <div class="dropzone-icon">📂</div>
+                                <p class="dropzone-text">엑셀 파일을 드래그하거나 클릭</p>
+                                <p class="dropzone-hint">.xlsx, .xls 지원 · A열: HEX 코드 · B열: 이름</p>
+                            </div>
+                            <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+                        </div>
+                        <div class="upload-info" id="uploadInfo" style="display:none">
+                            <span class="file-icon">📄</span>
+                            <span id="fileName"></span>
+                            <span class="badge" id="fileCount"></span>
+                            <button class="btn btn-xs btn-ghost" id="clearFileBtn" title="제거">✕</button>
+                        </div>
+                    </div>
+
+                    <!-- Paste mode (hidden by default) -->
+                    <div class="upload-left" id="pasteMode" style="display:none">
+                        <div class="paste-area">
+                            <label>엑셀에서 A열(코드)·B열(이름) 범위를 복사 후 아래에 붙여넣기 (Ctrl+V)</label>
+                            <textarea id="pasteInput" rows="8" spellcheck="false"
+                                placeholder="000&#9;default&#10;001&#9;jh_test_1&#10;A8C&#9;test_2&#10;&#10;엑셀에서 복사한 데이터를 여기에 붙여넣으세요"></textarea>
+                            <div class="paste-actions">
+                                <button class="btn btn-primary btn-sm" id="parsePasteBtn">✔ 데이터 적용</button>
+                                <button class="btn btn-ghost btn-sm" id="clearPasteBtn">지우기</button>
+                                <span class="paste-hint">탭(Tab)으로 코드와 이름 구분 · 줄바꿈으로 항목 구분</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data preview (shared) -->
+                    <div class="upload-right" id="dataPreview" style="display:none">
+                        <h3>미리보기 <small id="previewHint"></small></h3>
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>#</th><th>HEX</th><th>이름</th></tr></thead>
+                                <tbody id="previewBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
