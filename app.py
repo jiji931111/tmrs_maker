@@ -277,6 +277,7 @@ def generate():
     buf = io.BytesIO()
     base = input_fn.rsplit('.', 1)[0] if '.' in input_fn else input_fn
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        summary_lines = []
         for tmpl in selected:
             # Provide nested folder behavior if requested
             f_path = tmpl.get('folder', '')
@@ -295,7 +296,8 @@ def generate():
                 # Inject the specific dir for this template from the provided mapping
                 temp_tmpl = tmpl.copy()
                 dirs_map = tmrs_list2_cfg.get('template_dirs', {})
-                temp_tmpl['dir'] = dirs_map.get(tmpl['id'], '')
+                specific_dir = dirs_map.get(tmpl['id'], '')
+                temp_tmpl['dir'] = specific_dir
                 
                 list2_content = generate_tmrs_list_content(
                     tmrs_list2_cfg.get('header', ''),
@@ -304,6 +306,11 @@ def generate():
                     codes
                 )
                 zf.writestr(f"{folder_name}/{list2_fn}", list2_content)
+                summary_lines.append(f"[{tmpl['name']}] -> 등록 경로: {specific_dir}")
+
+        if summary_lines:
+            summary_text = "== 추가 파일 2 (템플릿별 개별 파일) 생성 요약 ==\n\n" + "\n".join(summary_lines)
+            zf.writestr('TMRS_DIR_Summary.txt', summary_text)
                 
         # File Option 1: Global common file
         if tmrs_list_cfg and tmrs_list_cfg.get('enabled') and selected:

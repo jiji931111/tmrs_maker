@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderVariableChips();
     renderFilePatternChips();
     initSplitResize();
+    restoreGenerationSettings();
 });
 
 function bindEvents() {
@@ -96,6 +97,17 @@ function bindEvents() {
     $('#collapseAllBtn').addEventListener('click', () => {
         getAllFolders().forEach(f => state.collapsedFolders.add(f));
         renderTemplateTree();
+    });
+    $('#toggleSelectAllBtn').addEventListener('click', () => {
+        const allIds = state.templates.map(t => t.id);
+        if (state.selectedIds.size === allIds.length && allIds.length > 0) {
+            state.selectedIds.clear();
+        } else {
+            allIds.forEach(id => state.selectedIds.add(id));
+        }
+        renderTemplateTree();
+        updateButtons();
+        scheduleLivePreview();
     });
 
     // Folder select toggle in editor
@@ -168,6 +180,58 @@ function bindEvents() {
         renderTmplPathInputs();
         updateButtons();
     });
+}
+
+function saveGenerationSettings() {
+    const tmrsListEnabled = $('#enableTmrsList').checked;
+    const tmrsListCfg = {
+        enabled: tmrsListEnabled,
+        filename: $('#tmrsListFileName').value,
+        header: $('#tmrsListHeader').value,
+        body: $('#tmrsListBody').value
+    };
+
+    const tmrsList2Enabled = $('#enableTmrsList2').checked;
+    const pathInputs = $('#tmrsListPathsContainer').querySelectorAll('input');
+    // Save paths globally based on template ID to persist even if selection changes
+    let savedPaths = {};
+    try { savedPaths = JSON.parse(localStorage.getItem('tmrsGenPaths')) || {}; } catch(e){}
+    pathInputs.forEach(inp => savedPaths[inp.dataset.id] = inp.value);
+
+    const tmrsList2Cfg = {
+        enabled: tmrsList2Enabled,
+        filename: $('#tmrsListFileName2').value,
+        header: $('#tmrsListHeader2').value,
+        body: $('#tmrsListBody2').value
+    };
+
+    localStorage.setItem('tmrsGenList1', JSON.stringify(tmrsListCfg));
+    localStorage.setItem('tmrsGenList2', JSON.stringify(tmrsList2Cfg));
+    localStorage.setItem('tmrsGenPaths', JSON.stringify(savedPaths));
+}
+
+function restoreGenerationSettings() {
+    try {
+        const list1 = JSON.parse(localStorage.getItem('tmrsGenList1'));
+        if (list1) {
+            $('#enableTmrsList').checked = list1.enabled;
+            if (list1.filename) $('#tmrsListFileName').value = list1.filename;
+            if (list1.header) $('#tmrsListHeader').value = list1.header;
+            if (list1.body) $('#tmrsListBody').value = list1.body;
+            $('#tmrsListPanel').style.display = list1.enabled ? 'block' : 'none';
+        }
+        
+        const list2 = JSON.parse(localStorage.getItem('tmrsGenList2'));
+        if (list2) {
+            $('#enableTmrsList2').checked = list2.enabled;
+            if (list2.filename) $('#tmrsListFileName2').value = list2.filename;
+            if (list2.header) $('#tmrsListHeader2').value = list2.header;
+            if (list2.body) $('#tmrsListBody2').value = list2.body;
+            $('#tmrsListPanel2').style.display = list2.enabled ? 'block' : 'none';
+        }
+    } catch(e) {
+        console.error('Generation settings restore failed', e);
+    }
 }
 
 // ── Variable Chips Rendering ─────────────────────────────────────
@@ -745,11 +809,17 @@ function renderTmplPathInputs() {
     const container = $('#tmrsListPathsContainer');
     const selectedTmpls = Array.from(state.selectedIds).map(id => state.templates.find(t => t.id === id)).filter(Boolean);
     
-    // Save current values to restore them
+    // Save current values to restore them or load from persistent storage
     const currentValues = {};
+    
+    // First, try to fetch from existing inputs if they are already rendered
     container.querySelectorAll('input').forEach(inp => {
         currentValues[inp.dataset.id] = inp.value;
     });
+
+    // Secondly, supplement with any globally saved paths from localStorage if missing
+    let savedPaths = {};
+    try { savedPaths = JSON.parse(localStorage.getItem('tmrsGenPaths')) || {}; } catch(e){}
 
     if (selectedTmpls.length === 0) {
         container.innerHTML = '<p style="color:var(--text-3); font-size:11px;">선택된 템플릿이 없습니다.</p>';
@@ -757,7 +827,7 @@ function renderTmplPathInputs() {
     }
 
     container.innerHTML = selectedTmpls.map(t => {
-        const val = currentValues[t.id] || '';
+        const val = currentValues[t.id] || savedPaths[t.id] || '';
         return `
         <div style="display:flex; align-items:center; gap:8px;">
             <span style="flex:1; font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
@@ -975,6 +1045,9 @@ async function doGenerate() {
         body: $('#tmrsListBody2').value,
         template_dirs: pathsMap
     };
+
+    // Save user settings so they load next time
+    saveGenerationSettings();
 
     try {
         const res = await fetch('/api/generate', {
