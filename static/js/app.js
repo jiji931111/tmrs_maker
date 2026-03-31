@@ -7,6 +7,9 @@ const VARIABLES = [
     { code: '%(filename_code)s', label: '전체 코드', desc: 'Excel A열의 3자리 HEX 코드 (예: A8C)', target: 'body' },
     { code: '%(tmrs_name)s',     label: 'TMRS 이름', desc: 'Excel B열의 이름 값', target: 'body' },
     { code: '%(code)s',          label: '코드',      desc: '전체 HEX 코드 (filename_code와 동일)', target: 'both' },
+    { code: '%(ori1)s',          label: '원본 1',     desc: '첫번째 자리 원본값 (변환전)', target: 'body' },
+    { code: '%(ori2)s',          label: '원본 2',     desc: '두번째 자리 원본값 (변환전)', target: 'body' },
+    { code: '%(ori3)s',          label: '원본 3',     desc: '세번째 자리 원본값 (변환전)', target: 'body' },
     { code: '%(val1)s',          label: '변환값 1',   desc: '첫번째 자리 매트릭스 변환값', target: 'body' },
     { code: '%(val2)s',          label: '변환값 2',   desc: '두번째 자리 매트릭스 변환값', target: 'body' },
     { code: '%(val3)s',          label: '변환값 3',   desc: '세번째 자리 매트릭스 변환값', target: 'body' },
@@ -153,6 +156,11 @@ function bindEvents() {
     // Generate
     $('#previewBtn').addEventListener('click', doPreview);
     $('#generateBtn').addEventListener('click', doGenerate);
+    
+    // TMRS List toggle
+    $('#enableTmrsList').addEventListener('change', (e) => {
+        $('#tmrsListPanel').style.display = e.target.checked ? 'block' : 'none';
+    });
 }
 
 // ── Variable Chips Rendering ─────────────────────────────────────
@@ -823,6 +831,31 @@ async function doPreview() {
         }
     }
 
+    // Check if TMRS_LIST is enabled, preview it for the first item
+    if ($('#enableTmrsList').checked && state.selectedIds.size > 0) {
+        try {
+            const firstTmplId = Array.from(state.selectedIds)[0];
+            const firstTmpl = state.templates.find(t => t.id === firstTmplId);
+            const tmrsListCfg = {
+                header: $('#tmrsListHeader').value,
+                body: $('#tmrsListBody').value
+            };
+            if (firstTmpl) {
+                const res = await fetch('/api/preview_tmrs_list', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ item: first, template: firstTmpl, cfg: tmrsListCfg })
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    cards.push({ tmplName: '통합설정', filename: 'TMRS_LIST.asc', content: json.content });
+                }
+            }
+        } catch (e) {
+            console.error('TMRS_LIST preview failed', e);
+        }
+    }
+
     if (errors.length > 0) {
         errors.forEach(err => toast(err, 'error'));
     }
@@ -854,10 +887,17 @@ async function doGenerate() {
     btn.innerHTML = '<span class="spinner"></span> 생성 중...';
     setStatus('파일 생성 중...');
 
-    try {
-        const inputName = $('#inputNameField').value.trim() || 
-            (state.uploadedData.filename === 'pasted_data' ? 'output' : state.uploadedData.filename);
+    const inputName = $('#inputNameField').value.trim() || 
+        (state.uploadedData.filename === 'pasted_data' ? 'output' : state.uploadedData.filename);
+    
+    const tmrsListEnabled = $('#enableTmrsList').checked;
+    const tmrsListCfg = {
+        enabled: tmrsListEnabled,
+        header: $('#tmrsListHeader').value,
+        body: $('#tmrsListBody').value
+    };
 
+    try {
         const res = await fetch('/api/generate', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
@@ -865,6 +905,7 @@ async function doGenerate() {
                 data: state.uploadedData.data,
                 template_ids: [...state.selectedIds],
                 input_filename: inputName,
+                tmrs_list: tmrsListCfg
             })
         });
 
@@ -877,9 +918,7 @@ async function doGenerate() {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const disposition = res.headers.get('content-disposition') || '';
-        const match = disposition.match(/filename[^;=\n]*=(['"]?)(.+?)\1(;|$)/);
-        a.download = match ? decodeURIComponent(match[2]) : 'output.zip';
+        a.download = (`${inputName}_output`.replace(/[^a-zA-Z0-9_\-\u3131-\uD79D]/g, '_')) + '.zip';
         a.href = url;
         document.body.appendChild(a);
         a.click();

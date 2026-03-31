@@ -210,7 +210,28 @@
                             <button class="btn btn-primary" id="generateBtn" disabled>파일 생성 & 다운로드</button>
                         </div>
                     </div>
-                    <div id="outputPreview">
+
+                    <!-- TMRS_LIST Global Setup -->
+                    <div class="tmrs-list-settings" style="margin-top: 16px;">
+                        <label class="toggle" style="margin-bottom: 8px;">
+                            <input type="checkbox" id="enableTmrsList">
+                            <span class="toggle-track"><span class="toggle-knob"></span></span>
+                            <span style="font-weight: 500;">TMRS_LIST 통합 파일 (1개) 함께 생성</span>
+                        </label>
+                        <div id="tmrsListPanel" style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label>머릿말 (선택, 최상단 1회 출력)</label>
+                                <textarea id="tmrsListHeader" rows="2" placeholder="예: TMRS LIST BEGIN..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>반복 항목 포맷 (인풋 줄마다 출력)</label>
+                                <textarea id="tmrsListBody" rows="3" placeholder='IF TMRS=%(seq)s THEN WRITE "%(tmrs_name)s TMRS(#%(val1)s)"'></textarea>
+                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(seq)s</code>(순서), <code>%(code)s</code>, <code>%(ori1)s</code>(변환전), <code>%(val1)s</code>(변환후), <code>%(tmrs_name)s</code> 등</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="preview-box" id="outputPreview">
                         <div class="preview-empty" id="previewEmpty">
                             <div class="preview-empty-icon">📄</div>
                             <p>데이터와 템플릿을 선택하면<br>여기에 미리보기가 표시됩니다</p>

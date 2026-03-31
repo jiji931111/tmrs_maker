@@ -76,6 +76,7 @@ def apply_template(tmpl, code, name):
     reps = {
         'filename_code': code, 'tmrs_name': name,
         'val1': v1, 'val2': v2, 'val3': v3, 'code': code,
+        'ori1': d1, 'ori2': d2, 'ori3': d3,
     }
 
     body = tmpl['body']
@@ -201,12 +202,65 @@ def preview():
     return jsonify(filename=fname, content=content)
 
 
+@app.route('/api/preview_tmrs_list', methods=['POST'])
+def preview_tmrs_list():
+    req = request.json
+    item = req.get('item')
+    tmpl = req.get('template')
+    cfg = req.get('cfg', {})
+    if not tmpl or not item:
+        return jsonify(error="데이터/템플릿 부족"), 400
+    content = generate_tmrs_list_content(cfg.get('header', ''), cfg.get('body', ''), tmpl, [item])
+    return jsonify(content=content)
+
+
+def generate_tmrs_list_content(header, body_fmt, tmpl, codes):
+    res = []
+    if header:
+        res.append(header)
+    for i, item in enumerate(codes):
+        code = item['code']
+        code_pad = code.zfill(3) if len(code) < 3 else code
+        name = item['name']
+        matrix = tmpl.get('matrix', {})
+        same = tmpl.get('use_same_matrix', True)
+        
+        v1, v2, v3 = code_pad[0], code_pad[1], code_pad[2]
+        if same:
+            sm = matrix.get('shared', {})
+            v1, v2, v3 = sm.get(v1, v1), sm.get(v2, v2), sm.get(v3, v3)
+        else:
+            v1 = matrix.get('pos1', {}).get(v1, v1)
+            v2 = matrix.get('pos2', {}).get(v2, v2)
+            v3 = matrix.get('pos3', {}).get(v3, v3)
+            
+        data = {
+            'seq': str(i),
+            'filename_code': code_pad,
+            'tmrs_name': name,
+            'code': code_pad,
+            'ori1': code_pad[0],
+            'ori2': code_pad[1],
+            'ori3': code_pad[2],
+            'val1': v1,
+            'val2': v2,
+            'val3': v3
+        }
+        try:
+            res.append(body_fmt % data)
+        except Exception as e:
+            res.append(f"[Line formatting error row {i}]: {str(e)}")
+            
+    return '\n'.join(res)
+
+
 @app.route('/api/generate', methods=['POST'])
 def generate():
     req = request.json
     codes = req.get('data', [])
     tids = req.get('template_ids', [])
     input_fn = req.get('input_filename', 'output')
+    tmrs_list_cfg = req.get('tmrs_list', None)
 
     if not codes:
         return jsonify(error="데이터 없음"), 400
@@ -222,11 +276,25 @@ def generate():
     base = input_fn.rsplit('.', 1)[0] if '.' in input_fn else input_fn
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for tmpl in selected:
+            # Provide nested folder behavior if requested
+            f_path = tmpl.get('folder', '')
             folder_name = f"{base}_{tmpl['name']}"
+            if f_path:
+                folder_name = f"{f_path}/{folder_name}"
+                
             for item in codes:
                 fn, body = apply_template(tmpl, item['code'], item['name'])
                 path = f"{folder_name}/{fn}"
                 zf.writestr(path, body)
+                
+        if tmrs_list_cfg and tmrs_list_cfg.get('enabled') and selected:
+            list_content = generate_tmrs_list_content(
+                tmrs_list_cfg.get('header', ''),
+                tmrs_list_cfg.get('body', ''),
+                selected[0],
+                codes
+            )
+            zf.writestr('TMRS_LIST.asc', list_content)
     buf.seek(0)
 
     return send_file(buf, mimetype='application/zip', as_attachment=True,
