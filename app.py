@@ -244,7 +244,8 @@ def generate_tmrs_list_content(header, body_fmt, tmpl, codes):
             'ori3': code_pad[2],
             'val1': v1,
             'val2': v2,
-            'val3': v3
+            'val3': v3,
+            'dir': tmpl.get('dir', '')
         }
         try:
             res.append(body_fmt % data)
@@ -261,6 +262,7 @@ def generate():
     tids = req.get('template_ids', [])
     input_fn = req.get('input_filename', 'output')
     tmrs_list_cfg = req.get('tmrs_list', None)
+    tmrs_list2_cfg = req.get('tmrs_list2', None)
 
     if not codes:
         return jsonify(error="데이터 없음"), 400
@@ -286,15 +288,33 @@ def generate():
                 fn, body = apply_template(tmpl, item['code'], item['name'])
                 path = f"{folder_name}/{fn}"
                 zf.writestr(path, body)
+            
+            # File Option 2: Per-template file
+            if tmrs_list2_cfg and tmrs_list2_cfg.get('enabled'):
+                list2_fn = tmrs_list2_cfg.get('filename', 'TMRS_DIR.asc')
+                # Inject the specific dir for this template from the provided mapping
+                temp_tmpl = tmpl.copy()
+                dirs_map = tmrs_list2_cfg.get('template_dirs', {})
+                temp_tmpl['dir'] = dirs_map.get(tmpl['id'], '')
                 
+                list2_content = generate_tmrs_list_content(
+                    tmrs_list2_cfg.get('header', ''),
+                    tmrs_list2_cfg.get('body', ''),
+                    temp_tmpl,
+                    codes
+                )
+                zf.writestr(f"{folder_name}/{list2_fn}", list2_content)
+                
+        # File Option 1: Global common file
         if tmrs_list_cfg and tmrs_list_cfg.get('enabled') and selected:
+            list_fn = tmrs_list_cfg.get('filename', 'TMRS_LIST.asc')
             list_content = generate_tmrs_list_content(
                 tmrs_list_cfg.get('header', ''),
                 tmrs_list_cfg.get('body', ''),
                 selected[0],
                 codes
             )
-            zf.writestr('TMRS_LIST.asc', list_content)
+            zf.writestr(list_fn, list_content)
     buf.seek(0)
 
     return send_file(buf, mimetype='application/zip', as_attachment=True,

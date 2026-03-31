@@ -160,6 +160,13 @@ function bindEvents() {
     // TMRS List toggle
     $('#enableTmrsList').addEventListener('change', (e) => {
         $('#tmrsListPanel').style.display = e.target.checked ? 'block' : 'none';
+        updateButtons();
+    });
+    
+    $('#enableTmrsList2').addEventListener('change', (e) => {
+        $('#tmrsListPanel2').style.display = e.target.checked ? 'block' : 'none';
+        renderTmplPathInputs();
+        updateButtons();
     });
 }
 
@@ -730,6 +737,34 @@ function updateButtons() {
     const hasSel = state.selectedIds.size > 0;
     $('#previewBtn').disabled = !(hasData && hasSel);
     $('#generateBtn').disabled = !(hasData && hasSel);
+    if (hasSel) renderTmplPathInputs();
+}
+
+function renderTmplPathInputs() {
+    if (!$('#enableTmrsList2').checked) return;
+    const container = $('#tmrsListPathsContainer');
+    const selectedTmpls = Array.from(state.selectedIds).map(id => state.templates.find(t => t.id === id)).filter(Boolean);
+    
+    // Save current values to restore them
+    const currentValues = {};
+    container.querySelectorAll('input').forEach(inp => {
+        currentValues[inp.dataset.id] = inp.value;
+    });
+
+    if (selectedTmpls.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-3); font-size:11px;">선택된 템플릿이 없습니다.</p>';
+        return;
+    }
+
+    container.innerHTML = selectedTmpls.map(t => {
+        const val = currentValues[t.id] || '';
+        return `
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="flex:1; font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(t.name)}</span>
+            <input type="text" class="path-input" data-id="${t.id}" value="${esc(val)}" placeholder="/절대경로/" style="flex:2; padding:4px 8px; font-size:11px; background:rgba(0,0,0,0.2) !important;">
+        </div>
+        `;
+    }).join('');
 }
 
 function clearPreviewCards() {
@@ -844,15 +879,45 @@ async function doPreview() {
                 const res = await fetch('/api/preview_tmrs_list', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ item: first, template: firstTmpl, cfg: tmrsListCfg })
+                    body: JSON.stringify({ item: first, template: firstTmpl, cfg: {
+                        header: $('#tmrsListHeader').value,
+                        body: $('#tmrsListBody').value
+                    } })
                 });
                 const json = await res.json();
                 if (res.ok) {
-                    cards.push({ tmplName: '통합설정', filename: 'TMRS_LIST.asc', content: json.content });
+                    cards.push({ tmplName: '추가 파일 1', filename: $('#tmrsListFileName').value || 'TMRS_LIST.asc', content: json.content });
                 }
             }
         } catch (e) {
-            console.error('TMRS_LIST preview failed', e);
+            console.error('File 1 preview failed', e);
+        }
+    }
+
+    if ($('#enableTmrsList2').checked && state.selectedIds.size > 0) {
+        try {
+            const firstTmplId = Array.from(state.selectedIds)[0];
+            const firstTmpl = state.templates.find(t => t.id === firstTmplId);
+            if (firstTmpl) {
+                const pathInputs = $('#tmrsListPathsContainer').querySelectorAll('input');
+                const pathsMap = {};
+                pathInputs.forEach(inp => pathsMap[inp.dataset.id] = inp.value);
+
+                const res = await fetch('/api/preview_tmrs_list', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ item: first, template: {...firstTmpl, dir: pathsMap[firstTmplId] || ''}, cfg: {
+                        header: $('#tmrsListHeader2').value,
+                        body: $('#tmrsListBody2').value
+                    } })
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    cards.push({ tmplName: '추가 파일 2', filename: $('#tmrsListFileName2').value || 'TMRS_DIR.asc', content: json.content });
+                }
+            }
+        } catch (e) {
+            console.error('File 2 preview failed', e);
         }
     }
 
@@ -890,11 +955,24 @@ async function doGenerate() {
     const inputName = $('#inputNameField').value.trim() || 
         (state.uploadedData.filename === 'pasted_data' ? 'output' : state.uploadedData.filename);
     
-    const tmrsListEnabled = $('#enableTmrsList').checked;
     const tmrsListCfg = {
         enabled: tmrsListEnabled,
+        filename: $('#tmrsListFileName').value.trim() || 'TMRS_LIST.asc',
         header: $('#tmrsListHeader').value,
         body: $('#tmrsListBody').value
+    };
+
+    const tmrsList2Enabled = $('#enableTmrsList2').checked;
+    const pathInputs = $('#tmrsListPathsContainer').querySelectorAll('input');
+    const pathsMap = {};
+    pathInputs.forEach(inp => pathsMap[inp.dataset.id] = inp.value);
+
+    const tmrsList2Cfg = {
+        enabled: tmrsList2Enabled,
+        filename: $('#tmrsListFileName2').value.trim() || 'TMRS_DIR.asc',
+        header: $('#tmrsListHeader2').value,
+        body: $('#tmrsListBody2').value,
+        template_dirs: pathsMap
     };
 
     try {
@@ -905,7 +983,8 @@ async function doGenerate() {
                 data: state.uploadedData.data,
                 template_ids: [...state.selectedIds],
                 input_filename: inputName,
-                tmrs_list: tmrsListCfg
+                tmrs_list: tmrsListCfg,
+                tmrs_list2: tmrsList2Cfg
             })
         });
 

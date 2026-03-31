@@ -134,12 +134,12 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="form-group">
+                                <label>출력 파일명 패턴 (예: TMRS%(code)s.asc)</label>
+                                <input type="text" id="tmplFilePattern" placeholder="예: TMRS%(code)s.asc" spellcheck="false">
+                            </div>
                             <div class="form-row">
-                                <div class="form-group flex1">
-                                    <label>파일명 패턴</label>
-                                    <input type="text" id="tmplFilePattern" placeholder="TMRS%(code)s.asc">
-                                    <div class="var-chips-inline" id="filePatternChips"></div>
-                                </div>
+                                <div class="var-chips-inline" id="filePatternChips"></div>
                                 <div class="form-group flex1">
                                     <label>태그 (선택)</label>
                                     <input type="text" id="tmplTags" placeholder="쉼표로 구분 (예: HBM, 테스트)">
@@ -211,22 +211,58 @@
                         </div>
                     </div>
 
-                    <!-- TMRS_LIST Global Setup -->
+                    <!-- Option 1: TMRS_LIST Localized/Global Setup -->
                     <div class="tmrs-list-settings" style="margin-top: 16px;">
                         <label class="toggle" style="margin-bottom: 8px;">
                             <input type="checkbox" id="enableTmrsList">
                             <span class="toggle-track"><span class="toggle-knob"></span></span>
-                            <span style="font-weight: 500;">TMRS_LIST 통합 파일 (1개) 함께 생성</span>
+                            <span style="font-weight: 500;">추가 파일 1 생성 [공통 1개]</span>
+                            <span class="badge" style="margin-left: 8px; font-size: 10px; opacity: 0.7;">압축파일 루트에 생성</span>
                         </label>
                         <div id="tmrsListPanel" style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label>파일명 (확장자 포함)</label>
+                                <input type="text" id="tmrsListFileName" placeholder="예: TMRS_LIST.asc" value="TMRS_LIST.asc" spellcheck="false">
+                            </div>
                             <div class="form-group" style="margin-bottom: 10px;">
                                 <label>머릿말 (선택, 최상단 1회 출력)</label>
                                 <textarea id="tmrsListHeader" rows="2" placeholder="예: TMRS LIST BEGIN..."></textarea>
                             </div>
                             <div class="form-group">
                                 <label>반복 항목 포맷 (인풋 줄마다 출력)</label>
-                                <textarea id="tmrsListBody" rows="3" placeholder='IF TMRS=%(seq)s THEN WRITE "%(tmrs_name)s TMRS(#%(val1)s)"'></textarea>
-                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(seq)s</code>(순서), <code>%(code)s</code>, <code>%(ori1)s</code>(변환전), <code>%(val1)s</code>(변환후), <code>%(tmrs_name)s</code> 등</div>
+                                <textarea id="tmrsListBody" rows="3" placeholder='IF TMRS=%(seq)s THEN WRITE "%(tmrs_name)s"'></textarea>
+                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(seq)s</code>, <code>%(code)s</code>, <code>%(val1)s</code>, <code>%(tmrs_name)s</code> 등</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: TMRS_DIR_LIST Per-template Setup -->
+                    <div class="tmrs-list-settings" style="margin-top: 12px;">
+                        <label class="toggle" style="margin-bottom: 8px;">
+                            <input type="checkbox" id="enableTmrsList2">
+                            <span class="toggle-track"><span class="toggle-knob"></span></span>
+                            <span style="font-weight: 500;">추가 파일 2 생성 [개별 생성]</span>
+                            <span class="badge" style="margin-left: 8px; font-size: 10px; opacity: 0.7;">각 템플릿 폴더마다 생성</span>
+                        </label>
+                        <div id="tmrsListPanel2" style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label>파일명 (확장자 포함)</label>
+                                <input type="text" id="tmrsListFileName2" placeholder="예: TMRS_DIR.asc" value="TMRS_DIR.asc" spellcheck="false">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label>머릿말 (선택, 최상단 1회 출력)</label>
+                                <textarea id="tmrsListHeader2" rows="2" placeholder="예: TMRS DIR LIST BEGIN..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>반복 항목 포맷 (인풋 줄마다 출력)</label>
+                                <textarea id="tmrsListBody2" rows="3" placeholder='%(dir)s/%(code)s.asc'></textarea>
+                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(dir)s</code>(입력한 경로), <code>%(code)s</code>, <code>%(seq)s</code> 등</div>
+                            </div>
+                            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
+                                <label style="font-size: 11px; color: var(--accent-light);">템플릿별 경로 설정 (실행 시 입력)</label>
+                                <div id="tmrsListPathsContainer" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                                    <!-- Dynamic path inputs go here -->
+                                </div>
                             </div>
                         </div>
                     </div>
