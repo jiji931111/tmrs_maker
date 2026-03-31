@@ -219,16 +219,16 @@ def generate():
         return jsonify(error="선택된 템플릿 없음"), 400
 
     buf = io.BytesIO()
-    multi = len(selected) > 1
+    base = input_fn.rsplit('.', 1)[0] if '.' in input_fn else input_fn
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for tmpl in selected:
+            folder_name = f"{base}_{tmpl['name']}"
             for item in codes:
                 fn, body = apply_template(tmpl, item['code'], item['name'])
-                path = f"{tmpl['name']}/{fn}" if multi else fn
+                path = f"{folder_name}/{fn}"
                 zf.writestr(path, body)
     buf.seek(0)
 
-    base = input_fn.rsplit('.', 1)[0] if '.' in input_fn else input_fn
     return send_file(buf, mimetype='application/zip', as_attachment=True,
                      download_name=f"{base}_output.zip")
 

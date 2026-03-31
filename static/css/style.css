@@ -100,12 +100,45 @@ body {
 
 /* === Split Panel (Template + Preview side by side) === */
 .split-panel {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: flex;
+    gap: 0;
+    align-items: stretch;
 }
-@media (max-width: 1024px) { .split-panel { grid-template-columns: 1fr; } }
+.split-panel > .card {
+    flex: 1 1 50%;
+    min-width: 280px;
+    overflow: hidden;
+}
+/* Divider handle for resizing */
+.split-divider {
+    flex: 0 0 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: col-resize;
+    position: relative;
+    z-index: 5;
+    user-select: none;
+}
+.split-divider:hover .divider-handle,
+.split-divider.active .divider-handle {
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(49,130,246,0.3);
+}
+.divider-handle {
+    width: 3px; height: 40px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.1);
+    transition: all 0.2s;
+}
+@media (max-width: 1024px) {
+    .split-panel { flex-direction: column; }
+    .split-divider {
+        flex: 0 0 8px;
+        cursor: row-resize;
+    }
+    .split-divider .divider-handle {
+        width: 40px; height: 3px;
+    }
+}
 
 /* === Card === */
 .card {
@@ -219,14 +252,78 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 td:first-child, th:first-child { width: 36px; text-align: center; color: var(--text-3); }
 .code-cell { font-family: var(--mono); font-weight: 500; color: var(--accent-light); }
 
-/* === Template List === */
-.template-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+/* === Template Tree === */
+.tmpl-toolbar {
+    display: flex; align-items: center; gap: 4px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.template-tree {
+    display: flex; flex-direction: column; gap: 2px;
+    margin-bottom: 12px;
+}
+
+/* Folder node */
+.tree-folder {
+    margin-bottom: 2px;
+}
+.tree-folder-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    user-select: none;
+    transition: all var(--transition);
+    font-size: 12px; font-weight: 500; color: var(--text-2);
+}
+.tree-folder-header:hover {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-1);
+}
+.tree-folder-toggle {
+    font-size: 10px; width: 14px; text-align: center;
+    color: var(--text-3);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.tree-folder.collapsed .tree-folder-toggle {
+    transform: rotate(-90deg);
+}
+.tree-folder-icon {
+    font-size: 13px; flex-shrink: 0;
+}
+.tree-folder-name { flex: 1; min-width: 0; }
+.tree-folder-count {
+    font-size: 10px; color: var(--text-3);
+    background: rgba(255,255,255,0.05);
+    padding: 1px 6px; border-radius: 10px;
+}
+.tree-folder-actions {
+    display: flex; gap: 2px; opacity: 0;
+    transition: opacity var(--transition);
+}
+.tree-folder-header:hover .tree-folder-actions { opacity: 1; }
+
+/* Folder children */
+.tree-folder-children {
+    padding-left: 16px;
+    display: flex; flex-direction: column; gap: 3px;
+    margin-top: 2px;
+    border-left: 1px solid rgba(255,255,255,0.04);
+    margin-left: 16px;
+}
+.tree-folder.collapsed .tree-folder-children {
+    display: none;
+}
+
+/* Template card in tree */
 .tmpl-card {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
     background: rgba(255,255,255,0.02);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-xs);
     transition: all var(--transition);
 }
 .tmpl-card:hover { border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
@@ -237,9 +334,111 @@ td:first-child, th:first-child { width: 36px; text-align: center; color: var(--t
     cursor: pointer; flex-shrink: 0;
 }
 .tmpl-info { flex: 1; min-width: 0; }
-.tmpl-name { font-weight: 500; font-size: 13px; }
-.tmpl-pattern { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
-.tmpl-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.tmpl-name { font-weight: 500; font-size: 12px; }
+.tmpl-pattern { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
+
+/* Action buttons with text */
+.tmpl-actions { display: flex; gap: 3px; flex-shrink: 0; }
+.tmpl-actions .btn-action {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 500;
+    border: none; cursor: pointer;
+    background: rgba(255,255,255,0.04);
+    color: var(--text-2);
+    transition: all var(--transition);
+    font-family: var(--font);
+    white-space: nowrap;
+}
+.tmpl-actions .btn-action:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--text-1);
+}
+.tmpl-actions .btn-action.action-delete:hover {
+    background: var(--red-bg);
+    color: var(--red);
+}
+.tmpl-actions .btn-action .action-icon { font-size: 11px; }
+
+/* Root-level templates (no folder) */
+.tree-root-items {
+    display: flex; flex-direction: column; gap: 3px;
+}
+
+/* Drag handle */
+.tmpl-drag-handle {
+    cursor: grab; flex-shrink: 0;
+    color: var(--text-3); font-size: 14px;
+    width: 16px; text-align: center;
+    user-select: none; line-height: 1;
+    opacity: 0.4;
+    transition: all var(--transition);
+}
+.tmpl-card:hover .tmpl-drag-handle { opacity: 0.8; color: var(--text-2); }
+.tmpl-drag-handle:active { cursor: grabbing; }
+
+/* Drag states */
+.tmpl-card.tmpl-dragging {
+    opacity: 0.4;
+    border-style: dashed;
+}
+.tree-folder-header.drag-over-folder {
+    background: var(--accent-bg) !important;
+    border: 1px dashed var(--accent);
+    border-radius: var(--radius-xs);
+    color: var(--text-1) !important;
+}
+.tree-root-drop.drag-over-folder {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+}
+
+/* Root drop zone */
+.tree-root-drop {
+    margin-top: 4px;
+    padding: 6px;
+    border: 1px dashed transparent;
+    border-radius: var(--radius-xs);
+    transition: all var(--transition);
+}
+.root-drop-label {
+    font-size: 11px; color: var(--text-3);
+    padding: 4px 6px; margin-bottom: 4px;
+    font-weight: 500;
+}
+/* During drag: show drop targets more clearly */
+.template-tree.drag-active .tree-folder-header {
+    border: 1px dashed rgba(255,255,255,0.08);
+    border-radius: var(--radius-xs);
+}
+.template-tree.drag-active .tree-root-drop {
+    border-color: rgba(255,255,255,0.08);
+}
+
+/* Folder select in editor */
+.folder-select-wrap {
+    display: flex; align-items: center; gap: 4px;
+}
+.folder-select {
+    flex: 1; padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text-1);
+    font-family: var(--font); font-size: 12px;
+    transition: border-color var(--transition);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238B8B92'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+.folder-select:focus { outline: none; border-color: var(--border-focus); }
+.folder-select option { background: var(--bg-card); color: var(--text-1); }
+.folder-new-input {
+    flex: 1; max-width: 160px;
+}
 
 /* === Buttons === */
 .btn {
@@ -379,6 +578,10 @@ textarea { resize: vertical; line-height: 1.7; }
 /* Template body textarea highlight for inserted variables */
 #tmplBody {
     min-height: 160px;
+    white-space: pre;
+    overflow-x: auto;
+    word-break: normal;
+    word-wrap: normal;
 }
 #tmplBody.drag-over {
     border-color: var(--accent);
@@ -453,12 +656,26 @@ textarea { resize: vertical; line-height: 1.7; }
 }
 .preview-panel .card { height: 100%; }
 .gen-actions {
-    display: flex; gap: 8px; flex-wrap: wrap;
+    display: flex; flex-direction: column; gap: 10px;
     margin-bottom: 16px;
 }
-.gen-actions .btn { flex: 1; justify-content: center; }
+.gen-name-input {
+    display: flex; align-items: center; gap: 8px;
+}
+.gen-name-input label {
+    font-size: 11px; font-weight: 500; color: var(--text-2);
+    white-space: nowrap; margin-bottom: 0;
+}
+.gen-name-input input {
+    max-width: 160px; padding: 7px 10px;
+    font-family: var(--font); font-size: 12px;
+}
+.gen-buttons {
+    display: flex; gap: 8px; flex-wrap: wrap;
+}
+.gen-buttons .btn { flex: 1; justify-content: center; }
 
-#outputPreview { }
+
 .preview-empty {
     text-align: center; padding: 40px 20px;
     color: var(--text-3); font-size: 12px;
@@ -488,8 +705,9 @@ textarea { resize: vertical; line-height: 1.7; }
     padding: 12px; margin: 0;
     font-family: var(--mono); font-size: 11px;
     color: var(--text-2); line-height: 1.7;
-    white-space: pre-wrap; word-break: break-all;
-    max-height: 300px; overflow-y: auto;
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 400px; overflow-y: auto;
 }
 
 /* === Live Preview Status === */
@@ -546,7 +764,9 @@ textarea { resize: vertical; line-height: 1.7; }
     .form-row { flex-direction: column; gap: 0; }
     .header-content { padding: 0 16px; }
     .app-main { padding: 12px 16px; }
-    .split-panel { grid-template-columns: 1fr; }
+    .split-panel { flex-direction: column; }
+    .split-divider { flex: 0 0 8px; cursor: row-resize; }
+    .split-divider .divider-handle { width: 40px; height: 3px; }
 }
 
 /* === Info Tip === */

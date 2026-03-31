@@ -20,6 +20,8 @@ const state = {
     editingId: null,
     _editMatrix: null,
     _previewDebounce: null,
+    collapsedFolders: new Set(),
+    _folderNewMode: false,
 };
 
 // ── DOM refs ─────────────────────────────────────────────────────
@@ -28,7 +30,7 @@ const dropzone       = $('#dropzone');
 const fileInput       = $('#fileInput');
 const uploadInfo      = $('#uploadInfo');
 const dataPreview     = $('#dataPreview');
-const templateList    = $('#templateList');
+const templateTree    = $('#templateTree');
 const templateEditor  = $('#templateEditor');
 const matrixContainer = $('#matrixContainer');
 const outputPreview   = $('#outputPreview');
@@ -41,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindEvents();
     renderVariableChips();
     renderFilePatternChips();
+    initSplitResize();
 });
 
 function bindEvents() {
@@ -70,6 +73,17 @@ function bindEvents() {
     $('#cancelEditorBtn').addEventListener('click', closeEditor);
     $('#saveTemplateBtn').addEventListener('click', saveTemplate);
     $('#useSameMatrix').addEventListener('change', () => renderMatrix());
+
+    // Folder toolbar
+    $('#addFolderBtn').addEventListener('click', addNewFolder);
+    $('#expandAllBtn').addEventListener('click', () => { state.collapsedFolders.clear(); renderTemplateTree(); });
+    $('#collapseAllBtn').addEventListener('click', () => {
+        getAllFolders().forEach(f => state.collapsedFolders.add(f));
+        renderTemplateTree();
+    });
+
+    // Folder select toggle in editor
+    $('#tmplFolderToggle').addEventListener('click', toggleFolderNewInput);
 
     // Template body - live preview on input
     $('#tmplBody').addEventListener('input', () => scheduleLivePreview());
@@ -242,6 +256,13 @@ function handlePaste() {
         data: data,
     };
 
+    // Don't overwrite input name if user already typed something
+    const nameField = $('#inputNameField');
+    if (!nameField.value.trim()) {
+        nameField.value = '';
+        nameField.placeholder = '예: JH (비워두면 output)';
+    }
+
     uploadInfo.style.display = 'none';
     const tbody = $('#previewBody');
     tbody.innerHTML = data.slice(0, 30).map((r, i) =>
@@ -295,6 +316,11 @@ function showUploadResult(data) {
     $('#fileCount').textContent = `${data.total}개`;
     uploadInfo.style.display = 'flex';
 
+    // Auto-fill input name from filename (strip extension)
+    const nameField = $('#inputNameField');
+    const baseName = data.filename.replace(/\.[^.]+$/, '');
+    nameField.value = baseName;
+
     const tbody = $('#previewBody');
     tbody.innerHTML = data.preview.map((r, i) =>
         `<tr><td>${i + 1}</td><td class="code-cell">${esc(r.code)}</td><td>${esc(r.name)}</td></tr>`
@@ -319,39 +345,107 @@ async function loadTemplates() {
         const res = await fetch('/api/templates');
         const json = await res.json();
         state.templates = json.templates || [];
-        renderTemplateList();
+        renderTemplateTree();
     } catch (e) { toast('템플릿 로드 실패', 'error'); }
 }
 
-function renderTemplateList() {
-    templateList.innerHTML = state.templates.map(t => {
-        const checked = state.selectedIds.has(t.id) ? 'checked' : '';
-        const selClass = state.selectedIds.has(t.id) ? 'selected' : '';
-        return `
-        <div class="tmpl-card ${selClass}" data-id="${t.id}">
-            <input type="checkbox" class="tmpl-check" ${checked} data-id="${t.id}">
-            <div class="tmpl-info">
-                <div class="tmpl-name">${esc(t.name)}</div>
-                <div class="tmpl-pattern">${esc(t.file_pattern)}</div>
+function getAllFolders() {
+    const folders = new Set();
+    state.templates.forEach(t => {
+        if (t.folder) folders.add(t.folder);
+    });
+    return [...folders].sort();
+}
+
+function renderTemplateTree() {
+    const folders = getAllFolders();
+    const rootTemplates = state.templates.filter(t => !t.folder);
+    const grouped = {};
+    folders.forEach(f => { grouped[f] = []; });
+    state.templates.forEach(t => {
+        if (t.folder && grouped[t.folder]) grouped[t.folder].push(t);
+    });
+
+    let html = '';
+
+    // Render folders
+    folders.forEach(folderName => {
+        const items = grouped[folderName];
+        const isCollapsed = state.collapsedFolders.has(folderName);
+        const collapsedClass = isCollapsed ? 'collapsed' : '';
+        const selectedInFolder = items.filter(t => state.selectedIds.has(t.id)).length;
+        const countLabel = selectedInFolder > 0 ? `${selectedInFolder}/${items.length}` : `${items.length}`;
+
+        html += `
+        <div class="tree-folder ${collapsedClass}" data-folder="${esc(folderName)}">
+            <div class="tree-folder-header" data-folder="${esc(folderName)}">
+                <span class="tree-folder-toggle">▾</span>
+                <span class="tree-folder-icon">📁</span>
+                <span class="tree-folder-name">${esc(folderName)}</span>
+                <span class="tree-folder-count">${countLabel}</span>
+                <div class="tree-folder-actions">
+                    <button class="btn btn-xs btn-ghost" onclick="renameFolder('${esc(folderName)}')" title="이름 변경">✏️</button>
+                    <button class="btn btn-xs btn-ghost btn-danger" onclick="deleteFolder('${esc(folderName)}')" title="폴더 삭제">🗑</button>
+                </div>
             </div>
-            <div class="tmpl-actions">
-                <button class="btn btn-xs btn-ghost" onclick="openEditor('${t.id}')" title="편집">✏️</button>
-                <button class="btn btn-xs btn-ghost" onclick="duplicateTemplate('${t.id}')" title="복제">📋</button>
-                <button class="btn btn-xs btn-ghost btn-danger" onclick="deleteTemplate('${t.id}')" title="삭제">🗑</button>
+            <div class="tree-folder-children">
+                ${items.map(t => renderTemplateCard(t)).join('')}
             </div>
         </div>`;
-    }).join('');
+    });
 
-    templateList.querySelectorAll('.tmpl-check').forEach(cb => {
+    // Root-level templates (no folder) + root drop zone
+    html += `<div class="tree-root-drop" data-folder="">
+        <div class="root-drop-label">📄 루트 (폴더 없음)</div>
+        <div class="tree-root-items">${rootTemplates.map(t => renderTemplateCard(t)).join('')}</div>
+    </div>`;
+
+    templateTree.innerHTML = html;
+
+    // Bind folder toggle
+    templateTree.querySelectorAll('.tree-folder-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            if (e.target.closest('.tree-folder-actions')) return;
+            const folder = header.dataset.folder;
+            if (state.collapsedFolders.has(folder)) state.collapsedFolders.delete(folder);
+            else state.collapsedFolders.add(folder);
+            renderTemplateTree();
+        });
+    });
+
+    // Bind checkboxes
+    templateTree.querySelectorAll('.tmpl-check').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const id = e.target.dataset.id;
             if (e.target.checked) state.selectedIds.add(id);
             else state.selectedIds.delete(id);
-            renderTemplateList();
+            renderTemplateTree();
             updateButtons();
             scheduleLivePreview();
         });
     });
+
+    // Bind drag & drop
+    bindTemplateDragDrop();
+}
+
+function renderTemplateCard(t) {
+    const checked = state.selectedIds.has(t.id) ? 'checked' : '';
+    const selClass = state.selectedIds.has(t.id) ? 'selected' : '';
+    return `
+    <div class="tmpl-card ${selClass}" data-id="${t.id}" draggable="true">
+        <div class="tmpl-drag-handle" title="드래그하여 폴더 이동">⠿</div>
+        <input type="checkbox" class="tmpl-check" ${checked} data-id="${t.id}">
+        <div class="tmpl-info">
+            <div class="tmpl-name">${esc(t.name)}</div>
+            <div class="tmpl-pattern">${esc(t.file_pattern)}</div>
+        </div>
+        <div class="tmpl-actions">
+            <button class="btn-action" onclick="openEditor('${t.id}')" title="편집"><span class="action-icon">✏️</span> 편집</button>
+            <button class="btn-action" onclick="duplicateTemplate('${t.id}')" title="복제"><span class="action-icon">📋</span> 복제</button>
+            <button class="btn-action action-delete" onclick="deleteTemplate('${t.id}')" title="삭제"><span class="action-icon">🗑</span> 삭제</button>
+        </div>
+    </div>`;
 }
 
 function openEditor(id) {
@@ -363,6 +457,14 @@ function openEditor(id) {
     $('#tmplFilePattern').value = t ? t.file_pattern : 'TMRS%(code)s.asc';
     $('#tmplBody').value = t ? t.body : '';
     $('#useSameMatrix').checked = t ? t.use_same_matrix !== false : true;
+
+    // Folder select
+    populateFolderSelect(t ? t.folder : '');
+    state._folderNewMode = false;
+    $('#tmplFolder').style.display = '';
+    $('#tmplFolderNew').style.display = 'none';
+    $('#tmplFolderNew').value = '';
+    $('#tmplFolderToggle').textContent = '✚';
 
     state._editMatrix = t ? JSON.parse(JSON.stringify(t.matrix)) : defaultMatrix();
     renderMatrix();
@@ -418,12 +520,20 @@ function collectEditorData() {
     const body = $('#tmplBody').value;
     const useSame = $('#useSameMatrix').checked;
 
+    // Folder: use new input if in new-mode, else select
+    let folder = '';
+    if (state._folderNewMode) {
+        folder = $('#tmplFolderNew').value.trim();
+    } else {
+        folder = $('#tmplFolder').value;
+    }
+
     if (!name) { toast('템플릿 이름을 입력하세요', 'error'); return null; }
     if (!pattern) { toast('파일명 패턴을 입력하세요', 'error'); return null; }
     if (!body) { toast('템플릿 내용을 입력하세요', 'error'); return null; }
 
     const matrix = state._editMatrix || defaultMatrix();
-    return { name, file_pattern: pattern, body, use_same_matrix: useSame, matrix };
+    return { name, folder, file_pattern: pattern, body, use_same_matrix: useSame, matrix };
 }
 
 async function saveTemplate() {
@@ -616,13 +726,16 @@ async function doGenerate() {
     setStatus('파일 생성 중...');
 
     try {
+        const inputName = $('#inputNameField').value.trim() || 
+            (state.uploadedData.filename === 'pasted_data' ? 'output' : state.uploadedData.filename);
+
         const res = await fetch('/api/generate', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({
                 data: state.uploadedData.data,
                 template_ids: [...state.selectedIds],
-                input_filename: state.uploadedData.filename,
+                input_filename: inputName,
             })
         });
 
@@ -678,3 +791,302 @@ function esc(s) {
     d.textContent = s || '';
     return d.innerHTML;
 }
+
+// ── Split Panel Resize ───────────────────────────────────────────
+function initSplitResize() {
+    const panel = $('#splitPanel');
+    const divider = $('#splitDivider');
+    if (!panel || !divider) return;
+
+    const leftCard = panel.querySelector('#templateSection');
+    const rightCard = panel.querySelector('#generateSection');
+    if (!leftCard || !rightCard) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let startLeftWidth = 0;
+    const MIN_WIDTH = 300; // minimum panel width in px
+
+    divider.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isDragging = true;
+        startX = e.clientX;
+        startLeftWidth = leftCard.getBoundingClientRect().width;
+        divider.classList.add('active');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const panelRect = panel.getBoundingClientRect();
+        const totalWidth = panelRect.width - 8; // subtract divider width
+        const delta = e.clientX - startX;
+        let newLeftWidth = startLeftWidth + delta;
+
+        // Clamp
+        newLeftWidth = Math.max(MIN_WIDTH, Math.min(newLeftWidth, totalWidth - MIN_WIDTH));
+
+        const leftPct = (newLeftWidth / totalWidth) * 100;
+        const rightPct = 100 - leftPct;
+
+        leftCard.style.flex = `0 0 ${leftPct}%`;
+        rightCard.style.flex = `0 0 ${rightPct}%`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        divider.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+
+    // Double-click to reset to 50/50
+    divider.addEventListener('dblclick', () => {
+        leftCard.style.flex = '';
+        rightCard.style.flex = '';
+    });
+}
+
+// ── Template Drag & Drop ─────────────────────────────────────────
+function bindTemplateDragDrop() {
+    // Make template cards draggable
+    templateTree.querySelectorAll('.tmpl-card[draggable]').forEach(card => {
+        card.addEventListener('dragstart', (e) => {
+            // Only allow drag from the handle
+            const handle = card.querySelector('.tmpl-drag-handle');
+            if (handle && !handle.contains(e.target) && e.target !== handle) {
+                // Allow drag from anywhere on the card but set data
+            }
+            e.dataTransfer.setData('text/plain', card.dataset.id);
+            e.dataTransfer.setData('application/x-tmpl-id', card.dataset.id);
+            e.dataTransfer.effectAllowed = 'move';
+            card.classList.add('tmpl-dragging');
+            // Add a class to the tree to show drop zones
+            setTimeout(() => templateTree.classList.add('drag-active'), 0);
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('tmpl-dragging');
+            templateTree.classList.remove('drag-active');
+            // Clean up all highlights
+            templateTree.querySelectorAll('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
+        });
+    });
+
+    // Make folder headers drop targets
+    templateTree.querySelectorAll('.tree-folder-header').forEach(header => {
+        header.addEventListener('dragover', (e) => {
+            if (!e.dataTransfer.types.includes('application/x-tmpl-id')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            header.classList.add('drag-over-folder');
+        });
+
+        header.addEventListener('dragleave', (e) => {
+            // Only remove if actually leaving the header
+            if (!header.contains(e.relatedTarget)) {
+                header.classList.remove('drag-over-folder');
+            }
+        });
+
+        header.addEventListener('drop', (e) => {
+            e.preventDefault();
+            header.classList.remove('drag-over-folder');
+            const tmplId = e.dataTransfer.getData('application/x-tmpl-id');
+            const targetFolder = header.dataset.folder;
+            if (tmplId && targetFolder) {
+                moveTemplateToFolder(tmplId, targetFolder);
+            }
+        });
+    });
+
+    // Make root drop zone a target
+    const rootDrop = templateTree.querySelector('.tree-root-drop');
+    if (rootDrop) {
+        rootDrop.addEventListener('dragover', (e) => {
+            if (!e.dataTransfer.types.includes('application/x-tmpl-id')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            rootDrop.classList.add('drag-over-folder');
+        });
+
+        rootDrop.addEventListener('dragleave', (e) => {
+            if (!rootDrop.contains(e.relatedTarget)) {
+                rootDrop.classList.remove('drag-over-folder');
+            }
+        });
+
+        rootDrop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            rootDrop.classList.remove('drag-over-folder');
+            const tmplId = e.dataTransfer.getData('application/x-tmpl-id');
+            if (tmplId) {
+                moveTemplateToFolder(tmplId, '');
+            }
+        });
+    }
+}
+
+async function moveTemplateToFolder(tmplId, targetFolder) {
+    const tmpl = state.templates.find(t => t.id === tmplId);
+    if (!tmpl) return;
+
+    // Don't move if already in the target folder
+    const currentFolder = tmpl.folder || '';
+    if (currentFolder === targetFolder) return;
+
+    const oldFolder = tmpl.folder || '루트';
+    const newFolder = targetFolder || '루트';
+
+    tmpl.folder = targetFolder;
+    try {
+        const res = await fetch(`/api/templates/${tmplId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tmpl),
+        });
+        if (!res.ok) throw new Error();
+        toast(`"${tmpl.name}" → ${newFolder}${targetFolder ? ' 폴더' : ''}로 이동`, 'success');
+        // Expand target folder if collapsed
+        if (targetFolder && state.collapsedFolders.has(targetFolder)) {
+            state.collapsedFolders.delete(targetFolder);
+        }
+        await loadTemplates();
+    } catch (e) {
+        tmpl.folder = currentFolder === '루트' ? '' : currentFolder;
+        toast('이동 실패', 'error');
+    }
+}
+
+// ── Folder Management ────────────────────────────────────────────
+function addNewFolder() {
+    const name = prompt('새 폴더 이름을 입력하세요:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    const existing = getAllFolders();
+    if (existing.includes(trimmed)) {
+        toast('이미 존재하는 폴더 이름입니다', 'error');
+        return;
+    }
+    // Create a placeholder — folders are implicit from template.folder
+    // We add a hidden marker template or simply let the user know to add templates
+    toast(`"${trimmed}" 폴더가 생성되었습니다. 템플릿 편집에서 이 폴더를 선택해주세요.`, 'info');
+    // We'll store folder names in a separate array to persist empty folders
+    if (!window._emptyFolders) window._emptyFolders = [];
+    window._emptyFolders.push(trimmed);
+    renderTemplateTree();
+}
+
+function renameFolder(oldName) {
+    const newName = prompt(`폴더 이름 변경: "${oldName}"`, oldName);
+    if (!newName || !newName.trim() || newName.trim() === oldName) return;
+    const trimmed = newName.trim();
+
+    // Update all templates in this folder
+    const toUpdate = state.templates.filter(t => t.folder === oldName);
+    if (toUpdate.length === 0) {
+        // Remove from empty folders if applicable
+        if (window._emptyFolders) {
+            window._emptyFolders = window._emptyFolders.filter(f => f !== oldName);
+            window._emptyFolders.push(trimmed);
+        }
+        renderTemplateTree();
+        toast('폴더 이름 변경 완료', 'success');
+        return;
+    }
+
+    // Batch update
+    Promise.all(toUpdate.map(t => {
+        t.folder = trimmed;
+        return fetch(`/api/templates/${t.id}`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(t)
+        });
+    })).then(() => {
+        toast('폴더 이름 변경 완료', 'success');
+        // Update collapsed state
+        if (state.collapsedFolders.has(oldName)) {
+            state.collapsedFolders.delete(oldName);
+            state.collapsedFolders.add(trimmed);
+        }
+        loadTemplates();
+    }).catch(() => toast('폴더 이름 변경 중 오류', 'error'));
+}
+
+function deleteFolder(folderName) {
+    const templates = state.templates.filter(t => t.folder === folderName);
+    const msg = templates.length > 0
+        ? `"${folderName}" 폴더를 삭제하시겠습니까?\n(${templates.length}개 템플릿은 루트로 이동됩니다)`
+        : `"${folderName}" 빈 폴더를 삭제하시겠습니까?`;
+
+    if (!confirm(msg)) return;
+
+    if (templates.length === 0) {
+        if (window._emptyFolders) {
+            window._emptyFolders = window._emptyFolders.filter(f => f !== folderName);
+        }
+        renderTemplateTree();
+        toast('폴더 삭제 완료', 'success');
+        return;
+    }
+
+    // Move templates to root
+    Promise.all(templates.map(t => {
+        t.folder = '';
+        return fetch(`/api/templates/${t.id}`, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(t)
+        });
+    })).then(() => {
+        state.collapsedFolders.delete(folderName);
+        toast('폴더 삭제 완료 (템플릿은 루트로 이동)', 'success');
+        loadTemplates();
+    }).catch(() => toast('폴더 삭제 중 오류', 'error'));
+}
+
+function populateFolderSelect(selectedFolder) {
+    const sel = $('#tmplFolder');
+    const folders = getAllFolders();
+    // Include empty folders
+    if (window._emptyFolders) {
+        window._emptyFolders.forEach(f => {
+            if (!folders.includes(f)) folders.push(f);
+        });
+        folders.sort();
+    }
+
+    sel.innerHTML = '<option value="">(루트)</option>' +
+        folders.map(f => `<option value="${esc(f)}" ${f === selectedFolder ? 'selected' : ''}>${esc(f)}</option>`).join('');
+}
+
+function toggleFolderNewInput() {
+    state._folderNewMode = !state._folderNewMode;
+    if (state._folderNewMode) {
+        $('#tmplFolder').style.display = 'none';
+        $('#tmplFolderNew').style.display = '';
+        $('#tmplFolderNew').focus();
+        $('#tmplFolderToggle').textContent = '📂';
+        $('#tmplFolderToggle').title = '기존 폴더 선택';
+    } else {
+        $('#tmplFolder').style.display = '';
+        $('#tmplFolderNew').style.display = 'none';
+        $('#tmplFolderToggle').textContent = '✚';
+        $('#tmplFolderToggle').title = '새 폴더 직접 입력';
+    }
+}
+
+// Override getAllFolders to include empty folders
+const _origGetAllFolders = getAllFolders;
+getAllFolders = function() {
+    const folders = _origGetAllFolders();
+    if (window._emptyFolders) {
+        window._emptyFolders.forEach(f => {
+            if (!folders.includes(f)) folders.push(f);
+        });
+    }
+    return folders.sort();
+};

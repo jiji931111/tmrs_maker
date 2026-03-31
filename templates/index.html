@@ -89,7 +89,7 @@
         </section>
 
         <!-- STEP 2 + 3: Template & Preview (side by side) -->
-        <div class="split-panel">
+        <div class="split-panel" id="splitPanel">
             <!-- Left: Template Settings -->
             <section class="card" id="templateSection">
                 <div class="card-header">
@@ -99,7 +99,12 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="templateList" class="template-list"></div>
+                    <div class="tmpl-toolbar">
+                        <button class="btn btn-ghost btn-sm" id="addFolderBtn" title="새 폴더 추가">📁 새 폴더</button>
+                        <button class="btn btn-ghost btn-sm" id="expandAllBtn" title="모두 펼치기">▾ 모두 펼치기</button>
+                        <button class="btn btn-ghost btn-sm" id="collapseAllBtn" title="모두 접기">▸ 모두 접기</button>
+                    </div>
+                    <div id="templateTree" class="template-tree"></div>
                     <button class="btn btn-outline btn-add" id="addTemplateBtn">
                         ＋ 새 템플릿 추가
                     </button>
@@ -115,6 +120,18 @@
                                     <label>템플릿 이름</label>
                                     <input type="text" id="tmplName" placeholder="예: 기본 템플릿">
                                 </div>
+                                <div class="form-group flex1">
+                                    <label>폴더</label>
+                                    <div class="folder-select-wrap">
+                                        <select id="tmplFolder" class="folder-select">
+                                            <option value="">(루트)</option>
+                                        </select>
+                                        <input type="text" id="tmplFolderNew" class="folder-new-input" placeholder="새 폴더 이름" style="display:none">
+                                        <button class="btn btn-xs btn-ghost" id="tmplFolderToggle" title="새 폴더 직접 입력">✚</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
                                 <div class="form-group flex1">
                                     <label>파일명 패턴</label>
                                     <input type="text" id="tmplFilePattern" placeholder="TMRS%(code)s.asc">
@@ -158,6 +175,11 @@
                 </div>
             </section>
 
+            <!-- Resize Divider -->
+            <div class="split-divider" id="splitDivider" title="드래그하여 패널 크기 조절">
+                <div class="divider-handle"></div>
+            </div>
+
             <!-- Right: Preview & Generate -->
             <section class="card preview-panel" id="generateSection">
                 <div class="card-header">
@@ -172,8 +194,14 @@
                 </div>
                 <div class="card-body">
                     <div class="gen-actions">
-                        <button class="btn btn-secondary" id="previewBtn" disabled>미리보기</button>
-                        <button class="btn btn-primary" id="generateBtn" disabled>파일 생성 & 다운로드</button>
+                        <div class="gen-name-input" id="genNameGroup">
+                            <label for="inputNameField">출력 이름</label>
+                            <input type="text" id="inputNameField" placeholder="예: JH" spellcheck="false">
+                        </div>
+                        <div class="gen-buttons">
+                            <button class="btn btn-secondary" id="previewBtn" disabled>미리보기</button>
+                            <button class="btn btn-primary" id="generateBtn" disabled>파일 생성 & 다운로드</button>
+                        </div>
                     </div>
                     <div id="outputPreview">
                         <div class="preview-empty" id="previewEmpty">
