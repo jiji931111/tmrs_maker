@@ -279,11 +279,8 @@ def generate():
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         summary_lines = []
         for tmpl in selected:
-            # Provide nested folder behavior if requested
-            f_path = tmpl.get('folder', '')
+            # Flatten folder structure in ZIP: place template folder directly at root
             folder_name = f"{base}_{tmpl['name']}"
-            if f_path:
-                folder_name = f"{f_path}/{folder_name}"
                 
             for item in codes:
                 fn, body = apply_template(tmpl, item['code'], item['name'])
@@ -306,10 +303,10 @@ def generate():
                     codes
                 )
                 zf.writestr(f"{folder_name}/{list2_fn}", list2_content)
-                summary_lines.append(f"[{tmpl['name']}] -> 등록 경로: {specific_dir}")
+                summary_lines.append(f"export {specific_dir}='/{folder_name}'")
 
         if summary_lines:
-            summary_text = "== 추가 파일 2 (템플릿별 개별 파일) 생성 요약 ==\n\n" + "\n".join(summary_lines)
+            summary_text = "\n".join(summary_lines)
             zf.writestr('TMRS_DIR_Summary.txt', summary_text)
                 
         # File Option 1: Global common file
