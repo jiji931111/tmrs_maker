@@ -7,7 +7,7 @@
     <meta name="description" content="반도체 테스트 장비용 TMRS 패턴 파일 생성 도구">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -17,27 +17,28 @@
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">
                     <h1>TMRS Pattern Maker</h1>
-                    <span class="version">v1.0</span>
+                    <span class="version">v2.0</span>
                 </div>
             </div>
-            <div class="header-right">
+            <div class="header-nav">
                 <span class="status-badge" id="statusBadge">대기 중</span>
             </div>
         </div>
     </header>
 
     <main class="app-main">
-        <!-- STEP 1: Upload / Paste -->
+        <!-- STEP 1: Data Input -->
         <section class="card" id="uploadSection">
             <div class="card-header">
-                <span class="step-badge">1</span>
-                <h2>데이터 입력</h2>
+                <div class="card-header-left">
+                    <span class="step-num">01</span>
+                    <h2>데이터 입력</h2>
+                </div>
             </div>
             <div class="card-body">
-                <!-- Input mode tabs -->
                 <div class="input-tabs">
-                    <button class="tab-btn active" id="tabFile" data-mode="file">📂 파일 업로드</button>
-                    <button class="tab-btn" id="tabPaste" data-mode="paste">📋 붙여넣기</button>
+                    <button class="tab-btn active" id="tabFile" data-mode="file">파일 업로드</button>
+                    <button class="tab-btn" id="tabPaste" data-mode="paste">붙여넣기</button>
                 </div>
 
                 <div class="upload-layout">
@@ -62,20 +63,20 @@
                     <!-- Paste mode (hidden by default) -->
                     <div class="upload-left" id="pasteMode" style="display:none">
                         <div class="paste-area">
-                            <label>엑셀에서 A열(코드)·B열(이름) 범위를 복사 후 아래에 붙여넣기 (Ctrl+V)</label>
-                            <textarea id="pasteInput" rows="8" spellcheck="false"
-                                placeholder="000&#9;default&#10;001&#9;jh_test_1&#10;A8C&#9;test_2&#10;&#10;엑셀에서 복사한 데이터를 여기에 붙여넣으세요"></textarea>
+                            <label>엑셀에서 A열(코드)·B열(이름) 범위를 복사 후 아래에 붙여넣기</label>
+                            <textarea id="pasteInput" rows="6" spellcheck="false"
+                                placeholder="000&#9;default&#10;001&#9;test_1&#10;A8C&#9;test_2"></textarea>
                             <div class="paste-actions">
-                                <button class="btn btn-primary btn-sm" id="parsePasteBtn">✔ 데이터 적용</button>
+                                <button class="btn btn-primary btn-sm" id="parsePasteBtn">데이터 적용</button>
                                 <button class="btn btn-ghost btn-sm" id="clearPasteBtn">지우기</button>
-                                <span class="paste-hint">탭(Tab)으로 코드와 이름 구분 · 줄바꿈으로 항목 구분</span>
+                                <span class="paste-hint">탭으로 코드·이름 구분 · 줄바꿈으로 항목 구분</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Data preview (shared) -->
                     <div class="upload-right" id="dataPreview" style="display:none">
-                        <h3>미리보기 <small id="previewHint"></small></h3>
+                        <h3>데이터 미리보기 <small id="previewHint"></small></h3>
                         <div class="table-wrap">
                             <table>
                                 <thead><tr><th>#</th><th>HEX</th><th>이름</th></tr></thead>
@@ -87,78 +88,103 @@
             </div>
         </section>
 
-        <!-- STEP 2: Templates -->
-        <section class="card" id="templateSection">
-            <div class="card-header">
-                <span class="step-badge">2</span>
-                <h2>변환 템플릿 설정</h2>
-            </div>
-            <div class="card-body">
-                <div id="templateList" class="template-list"></div>
-                <button class="btn btn-outline btn-add" id="addTemplateBtn">
-                    <span>＋</span> 새 템플릿 추가
-                </button>
-
-                <div class="template-editor" id="templateEditor" style="display:none">
-                    <div class="editor-header">
-                        <h3 id="editorTitle">템플릿 편집</h3>
-                        <button class="btn btn-xs btn-ghost" id="closeEditorBtn">✕</button>
-                    </div>
-                    <div class="editor-body">
-                        <div class="form-row">
-                            <div class="form-group flex1">
-                                <label>템플릿 이름</label>
-                                <input type="text" id="tmplName" placeholder="예: 기본 템플릿">
-                            </div>
-                            <div class="form-group flex1">
-                                <label>파일명 패턴 <span class="info-tip" title="%(code)s %(tmrs_name)s %(val1)s %(val2)s %(val3)s 사용 가능">ⓘ</span></label>
-                                <input type="text" id="tmplFilePattern" placeholder="TMRS%(code)s.asc">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>템플릿 내용 <span class="info-tip" title="%(filename_code)s=전체코드 %(tmrs_name)s=이름 %(val1)s %(val2)s %(val3)s=변환값">ⓘ</span></label>
-                            <div class="placeholder-hints">
-                                <code>%(filename_code)s</code><code>%(tmrs_name)s</code>
-                                <code>%(val1)s</code><code>%(val2)s</code><code>%(val3)s</code><code>%(code)s</code>
-                            </div>
-                            <textarea id="tmplBody" rows="8" spellcheck="false" placeholder="파일 내용을 입력하세요..."></textarea>
-                        </div>
-                        <div class="matrix-section">
-                            <div class="matrix-header">
-                                <h4>변환 매트릭스</h4>
-                                <label class="toggle">
-                                    <input type="checkbox" id="useSameMatrix" checked>
-                                    <span class="toggle-track"><span class="toggle-knob"></span></span>
-                                    <span>전체 동일 매핑</span>
-                                </label>
-                            </div>
-                            <div id="matrixContainer"></div>
-                        </div>
-                        <div class="editor-actions">
-                            <button class="btn btn-primary" id="saveTemplateBtn">💾 저장</button>
-                            <button class="btn btn-ghost" id="cancelEditorBtn">취소</button>
-                        </div>
+        <!-- STEP 2 + 3: Template & Preview (side by side) -->
+        <div class="split-panel">
+            <!-- Left: Template Settings -->
+            <section class="card" id="templateSection">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <span class="step-num">02</span>
+                        <h2>변환 템플릿 설정</h2>
                     </div>
                 </div>
-            </div>
-        </section>
+                <div class="card-body">
+                    <div id="templateList" class="template-list"></div>
+                    <button class="btn btn-outline btn-add" id="addTemplateBtn">
+                        ＋ 새 템플릿 추가
+                    </button>
 
-        <!-- STEP 3: Generate -->
-        <section class="card" id="generateSection">
-            <div class="card-header">
-                <span class="step-badge">3</span>
-                <h2>미리보기 & 생성</h2>
-            </div>
-            <div class="card-body">
-                <div class="gen-actions">
-                    <button class="btn btn-secondary" id="previewBtn" disabled>👁 미리보기</button>
-                    <button class="btn btn-primary btn-glow" id="generateBtn" disabled>🚀 파일 생성 & 다운로드</button>
+                    <div class="template-editor" id="templateEditor" style="display:none">
+                        <div class="editor-header">
+                            <h3 id="editorTitle">템플릿 편집</h3>
+                            <button class="btn btn-xs btn-ghost" id="closeEditorBtn">✕</button>
+                        </div>
+                        <div class="editor-body">
+                            <div class="form-row">
+                                <div class="form-group flex1">
+                                    <label>템플릿 이름</label>
+                                    <input type="text" id="tmplName" placeholder="예: 기본 템플릿">
+                                </div>
+                                <div class="form-group flex1">
+                                    <label>파일명 패턴</label>
+                                    <input type="text" id="tmplFilePattern" placeholder="TMRS%(code)s.asc">
+                                    <div class="var-chips-inline" id="filePatternChips"></div>
+                                </div>
+                            </div>
+
+                            <!-- Variable Panel -->
+                            <div class="var-panel">
+                                <div class="var-panel-title">
+                                    사용 가능한 변수
+                                    <span class="hint">클릭하면 커서 위치에 삽입됩니다. 드래그도 가능합니다.</span>
+                                </div>
+                                <div class="var-chips" id="varChips">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>템플릿 내용</label>
+                                <textarea id="tmplBody" rows="8" spellcheck="false" placeholder="파일 내용을 입력하세요..."></textarea>
+                            </div>
+
+                            <div class="matrix-section">
+                                <div class="matrix-header">
+                                    <h4>변환 매트릭스</h4>
+                                    <label class="toggle">
+                                        <input type="checkbox" id="useSameMatrix" checked>
+                                        <span class="toggle-track"><span class="toggle-knob"></span></span>
+                                        <span>전체 동일 매핑</span>
+                                    </label>
+                                </div>
+                                <div id="matrixContainer"></div>
+                            </div>
+                            <div class="editor-actions">
+                                <button class="btn btn-primary" id="saveTemplateBtn">저장</button>
+                                <button class="btn btn-ghost" id="cancelEditorBtn">취소</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="outputPreview" style="display:none">
-                    <div id="previewCards"></div>
+            </section>
+
+            <!-- Right: Preview & Generate -->
+            <section class="card preview-panel" id="generateSection">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <span class="step-num">03</span>
+                        <h2>미리보기 & 생성</h2>
+                    </div>
+                    <div class="live-indicator" id="liveIndicator" style="display:none">
+                        <span class="live-dot"></span>
+                        실시간
+                    </div>
                 </div>
-            </div>
-        </section>
+                <div class="card-body">
+                    <div class="gen-actions">
+                        <button class="btn btn-secondary" id="previewBtn" disabled>미리보기</button>
+                        <button class="btn btn-primary" id="generateBtn" disabled>파일 생성 & 다운로드</button>
+                    </div>
+                    <div id="outputPreview">
+                        <div class="preview-empty" id="previewEmpty">
+                            <div class="preview-empty-icon">📄</div>
+                            <p>데이터와 템플릿을 선택하면<br>여기에 미리보기가 표시됩니다</p>
+                        </div>
+                        <div id="previewCards"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
     </main>
 
     <div class="toast-container" id="toastContainer"></div>

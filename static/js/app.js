@@ -1,13 +1,25 @@
-/* ── TMRS Pattern Maker – Frontend Logic ──────────────────────── */
+/* ── TMRS Pattern Maker – Frontend Logic v2 ───────────────────── */
 
 const HEX = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'];
 
+// ── Available Variables ──────────────────────────────────────────
+const VARIABLES = [
+    { code: '%(filename_code)s', label: '전체 코드', desc: 'Excel A열의 3자리 HEX 코드 (예: A8C)', target: 'body' },
+    { code: '%(tmrs_name)s',     label: 'TMRS 이름', desc: 'Excel B열의 이름 값', target: 'body' },
+    { code: '%(code)s',          label: '코드',      desc: '전체 HEX 코드 (filename_code와 동일)', target: 'both' },
+    { code: '%(val1)s',          label: '변환값 1',   desc: '첫번째 자리 매트릭스 변환값', target: 'body' },
+    { code: '%(val2)s',          label: '변환값 2',   desc: '두번째 자리 매트릭스 변환값', target: 'body' },
+    { code: '%(val3)s',          label: '변환값 3',   desc: '세번째 자리 매트릭스 변환값', target: 'body' },
+];
+
 // ── State ────────────────────────────────────────────────────────
 const state = {
-    uploadedData: null,   // { filename, total, data:[{code,name},...] }
+    uploadedData: null,
     templates: [],
     selectedIds: new Set(),
-    editingId: null,      // null = new, string = editing existing
+    editingId: null,
+    _editMatrix: null,
+    _previewDebounce: null,
 };
 
 // ── DOM refs ─────────────────────────────────────────────────────
@@ -27,6 +39,8 @@ const toastContainer  = $('#toastContainer');
 document.addEventListener('DOMContentLoaded', async () => {
     await loadTemplates();
     bindEvents();
+    renderVariableChips();
+    renderFilePatternChips();
 });
 
 function bindEvents() {
@@ -57,22 +71,114 @@ function bindEvents() {
     $('#saveTemplateBtn').addEventListener('click', saveTemplate);
     $('#useSameMatrix').addEventListener('change', () => renderMatrix());
 
-    // Placeholder hints – click to insert into textarea
-    document.querySelectorAll('.placeholder-hints code').forEach(el => {
-        el.addEventListener('click', () => {
-            const ta = $('#tmplBody');
-            const start = ta.selectionStart;
-            const before = ta.value.substring(0, start);
-            const after = ta.value.substring(ta.selectionEnd);
-            ta.value = before + el.textContent + after;
-            ta.focus();
-            ta.selectionStart = ta.selectionEnd = start + el.textContent.length;
-        });
+    // Template body - live preview on input
+    $('#tmplBody').addEventListener('input', () => scheduleLivePreview());
+
+    // Template body - drag over support
+    const tmplBody = $('#tmplBody');
+    tmplBody.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        tmplBody.classList.add('drag-over');
+    });
+    tmplBody.addEventListener('dragleave', () => {
+        tmplBody.classList.remove('drag-over');
+    });
+    tmplBody.addEventListener('drop', (e) => {
+        e.preventDefault();
+        tmplBody.classList.remove('drag-over');
+        const varCode = e.dataTransfer.getData('text/plain');
+        if (varCode && varCode.startsWith('%(')) {
+            // Insert at drop position
+            const rect = tmplBody.getBoundingClientRect();
+            // For textarea, we insert at the current cursor or end
+            const pos = tmplBody.selectionStart || tmplBody.value.length;
+            const before = tmplBody.value.substring(0, pos);
+            const after = tmplBody.value.substring(pos);
+            tmplBody.value = before + varCode + after;
+            tmplBody.focus();
+            tmplBody.selectionStart = tmplBody.selectionEnd = pos + varCode.length;
+            scheduleLivePreview();
+        }
+    });
+
+    // File pattern input - drag over support
+    const patternInput = $('#tmplFilePattern');
+    patternInput.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+    patternInput.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const varCode = e.dataTransfer.getData('text/plain');
+        if (varCode && varCode.startsWith('%(')) {
+            const pos = patternInput.selectionStart || patternInput.value.length;
+            const before = patternInput.value.substring(0, pos);
+            const after = patternInput.value.substring(pos);
+            patternInput.value = before + varCode + after;
+            patternInput.focus();
+            patternInput.selectionStart = patternInput.selectionEnd = pos + varCode.length;
+        }
     });
 
     // Generate
     $('#previewBtn').addEventListener('click', doPreview);
     $('#generateBtn').addEventListener('click', doGenerate);
+}
+
+// ── Variable Chips Rendering ─────────────────────────────────────
+function renderVariableChips() {
+    const container = $('#varChips');
+    container.innerHTML = VARIABLES.map(v => `
+        <div class="var-chip" draggable="true" data-code="${esc(v.code)}" data-target="${v.target}">
+            <span class="chip-label">${esc(v.label)}</span>
+            <span class="chip-code">${esc(v.code)}</span>
+            <span class="chip-tooltip">${esc(v.desc)}</span>
+        </div>
+    `).join('');
+
+    // Click to insert
+    container.querySelectorAll('.var-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const code = chip.dataset.code;
+            insertAtCursor($('#tmplBody'), code);
+            scheduleLivePreview();
+        });
+
+        // Drag start
+        chip.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', chip.dataset.code);
+            e.dataTransfer.effectAllowed = 'copy';
+            chip.classList.add('dragging');
+        });
+        chip.addEventListener('dragend', () => {
+            chip.classList.remove('dragging');
+        });
+    });
+}
+
+function renderFilePatternChips() {
+    const container = $('#filePatternChips');
+    const patternVars = VARIABLES.filter(v => v.target === 'both' || v.target === 'pattern');
+    // For file pattern, show code, tmrs_name, val1-3
+    const allVars = VARIABLES;
+    container.innerHTML = allVars.map(v => `
+        <span class="var-chip-sm" data-code="${esc(v.code)}" title="${esc(v.desc)}">${esc(v.label)}</span>
+    `).join('');
+
+    container.querySelectorAll('.var-chip-sm').forEach(chip => {
+        chip.addEventListener('click', () => {
+            insertAtCursor($('#tmplFilePattern'), chip.dataset.code);
+        });
+    });
+}
+
+function insertAtCursor(textarea, text) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+    textarea.value = before + text + after;
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = start + text.length;
 }
 
 // ── Input Mode Switching ─────────────────────────────────────────
@@ -100,17 +206,13 @@ function handlePaste() {
     const isHex = s => s && s.length === 3 && /^[0-9A-Fa-f]{3}$/.test(s);
 
     for (const line of lines) {
-        // Tab or multiple spaces as delimiter
         const parts = line.split(/\t|\s{2,}/);
         let code = (parts[0] || '').trim();
         const name = (parts[1] || '').trim();
 
-        // Handle decimal numbers from Excel (e.g., "1.0" → "1", "10.0" → "10")
         if (code && /^\d+\.\d*$/.test(code)) {
             code = code.split('.')[0];
         }
-
-        // Pad short hex codes
         if (code && code.length < 3 && /^[0-9A-Fa-f]+$/.test(code)) {
             code = code.padStart(3, '0');
         }
@@ -130,7 +232,7 @@ function handlePaste() {
     }
 
     if (skipped.length > 0) {
-        toast(`${skipped.length}개 항목이 유효하지 않아 건너뜀: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '...' : ''}`, 'warning');
+        toast(`${skipped.length}개 항목이 유효하지 않아 건너뜀`, 'warning');
     }
 
     state.uploadedData = {
@@ -140,7 +242,6 @@ function handlePaste() {
         data: data,
     };
 
-    // Show preview (reuse same function but hide file info)
     uploadInfo.style.display = 'none';
     const tbody = $('#previewBody');
     tbody.innerHTML = data.slice(0, 30).map((r, i) =>
@@ -152,6 +253,7 @@ function handlePaste() {
     toast(`${data.length}개 코드 파싱 완료`, 'success');
     setStatus('데이터 준비됨');
     updateButtons();
+    scheduleLivePreview();
 }
 
 // ── Toast ────────────────────────────────────────────────────────
@@ -160,7 +262,7 @@ function toast(msg, type = 'info') {
     el.className = `toast toast-${type}`;
     el.textContent = msg;
     const duration = (type === 'error' || type === 'warning') ? 5000 : 3000;
-    el.style.animation = `toastIn 0.3s ease, toastOut 0.3s ease ${duration - 300}ms forwards`;
+    el.style.animation = `toastIn 0.2s ease, toastOut 0.2s ease ${duration - 200}ms forwards`;
     toastContainer.appendChild(el);
     setTimeout(() => el.remove(), duration);
 }
@@ -181,6 +283,7 @@ async function handleUpload(file) {
         toast(`${json.total}개 코드 로드 완료`, 'success');
         setStatus('데이터 준비됨');
         updateButtons();
+        scheduleLivePreview();
     } catch (e) {
         toast('업로드 중 오류 발생', 'error');
         setStatus('오류');
@@ -205,7 +308,7 @@ function clearUpload() {
     fileInput.value = '';
     uploadInfo.style.display = 'none';
     dataPreview.style.display = 'none';
-    outputPreview.style.display = 'none';
+    clearPreviewCards();
     setStatus('대기 중');
     updateButtons();
 }
@@ -239,7 +342,6 @@ function renderTemplateList() {
         </div>`;
     }).join('');
 
-    // Checkbox events
     templateList.querySelectorAll('.tmpl-check').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const id = e.target.dataset.id;
@@ -247,6 +349,7 @@ function renderTemplateList() {
             else state.selectedIds.delete(id);
             renderTemplateList();
             updateButtons();
+            scheduleLivePreview();
         });
     });
 }
@@ -255,13 +358,12 @@ function openEditor(id) {
     state.editingId = id;
     const t = id ? state.templates.find(x => x.id === id) : null;
 
-    $('#editorTitle').textContent = t ? `템플릿 편집: ${t.name}` : '새 템플릿 만들기';
+    $('#editorTitle').textContent = t ? `편집: ${t.name}` : '새 템플릿';
     $('#tmplName').value = t ? t.name : '';
     $('#tmplFilePattern').value = t ? t.file_pattern : 'TMRS%(code)s.asc';
     $('#tmplBody').value = t ? t.body : '';
     $('#useSameMatrix').checked = t ? t.use_same_matrix !== false : true;
 
-    // Store current matrix data for rendering
     state._editMatrix = t ? JSON.parse(JSON.stringify(t.matrix)) : defaultMatrix();
     renderMatrix();
     templateEditor.style.display = '';
@@ -289,7 +391,7 @@ function renderMatrix() {
         headers = '<th>HEX</th><th>변환값</th>';
     } else {
         cols = ['pos1', 'pos2', 'pos3'];
-        headers = '<th>HEX</th><th>1번째 자리</th><th>2번째 자리</th><th>3번째 자리</th>';
+        headers = '<th>HEX</th><th>1번째</th><th>2번째</th><th>3번째</th>';
     }
 
     const rows = HEX.map(h => {
@@ -302,7 +404,6 @@ function renderMatrix() {
 
     matrixContainer.innerHTML = `<table class="matrix-table"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
 
-    // Sync inputs back to state on change
     matrixContainer.querySelectorAll('input').forEach(inp => {
         inp.addEventListener('input', () => {
             if (!state._editMatrix) state._editMatrix = defaultMatrix();
@@ -321,9 +422,7 @@ function collectEditorData() {
     if (!pattern) { toast('파일명 패턴을 입력하세요', 'error'); return null; }
     if (!body) { toast('템플릿 내용을 입력하세요', 'error'); return null; }
 
-    // Read matrix from inputs
     const matrix = state._editMatrix || defaultMatrix();
-
     return { name, file_pattern: pattern, body, use_same_matrix: useSame, matrix };
 }
 
@@ -346,6 +445,7 @@ async function saveTemplate() {
         toast('템플릿 저장 완료', 'success');
         closeEditor();
         await loadTemplates();
+        scheduleLivePreview();
     } catch (e) { toast('저장 중 오류', 'error'); }
 }
 
@@ -385,12 +485,76 @@ function updateButtons() {
     $('#generateBtn').disabled = !(hasData && hasSel);
 }
 
+function clearPreviewCards() {
+    previewCards.innerHTML = '';
+    $('#previewEmpty').style.display = '';
+    $('#liveIndicator').style.display = 'none';
+}
+
+function scheduleLivePreview() {
+    clearTimeout(state._previewDebounce);
+    state._previewDebounce = setTimeout(() => doLivePreview(), 400);
+}
+
+async function doLivePreview() {
+    // Live preview: if data + selected templates exist, auto-preview
+    if (!state.uploadedData || state.selectedIds.size === 0) return;
+
+    const first = state.uploadedData.data[0];
+    if (!first) return;
+
+    const cards = [];
+    for (const tid of state.selectedIds) {
+        const tmpl = state.templates.find(t => t.id === tid);
+        if (!tmpl) continue;
+
+        // If we're currently editing this template, use the editor values
+        let tmplToUse = tmpl;
+        if (state.editingId === tid) {
+            const editorData = {
+                ...tmpl,
+                body: $('#tmplBody').value,
+                file_pattern: $('#tmplFilePattern').value,
+                use_same_matrix: $('#useSameMatrix').checked,
+                matrix: state._editMatrix || tmpl.matrix,
+            };
+            tmplToUse = editorData;
+        }
+
+        try {
+            const res = await fetch('/api/preview', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ code_item: first, template: tmplToUse })
+            });
+            const json = await res.json();
+            if (res.ok) {
+                cards.push({ tmplName: tmplToUse.name, filename: json.filename, content: json.content });
+            }
+        } catch (e) { /* silent for live preview */ }
+    }
+
+    if (cards.length > 0) {
+        $('#previewEmpty').style.display = 'none';
+        $('#liveIndicator').style.display = 'inline-flex';
+        previewCards.innerHTML = cards.map(c => `
+            <div class="preview-card">
+                <div class="preview-card-header">
+                    <span class="fname">${esc(c.filename)}</span>
+                    <span class="tmpl-tag">${esc(c.tmplName)}</span>
+                </div>
+                <pre>${esc(c.content)}</pre>
+            </div>
+        `).join('');
+    }
+}
+
 async function doPreview() {
     if (!state.uploadedData || state.selectedIds.size === 0) return;
 
     const first = state.uploadedData.data[0];
     if (!first) {
-        toast('미리보기할 데이터가 없습니다. 데이터를 다시 입력해주세요.', 'error');
+        toast('미리보기할 데이터가 없습니다', 'error');
         return;
     }
 
@@ -400,7 +564,7 @@ async function doPreview() {
     for (const tid of state.selectedIds) {
         const tmpl = state.templates.find(t => t.id === tid);
         if (!tmpl) {
-            errors.push(`템플릿 ID '${tid}'를 찾을 수 없습니다 (삭제/변경됨)`);
+            errors.push(`템플릿을 찾을 수 없습니다`);
             continue;
         }
         try {
@@ -416,20 +580,21 @@ async function doPreview() {
             }
             cards.push({ tmplName: tmpl.name, filename: json.filename, content: json.content });
         } catch (e) {
-            errors.push(`[${tmpl.name}] 네트워크 오류: ${e.message}`);
+            errors.push(`[${tmpl.name}] 네트워크 오류`);
         }
     }
 
-    // Show errors if any
     if (errors.length > 0) {
         errors.forEach(err => toast(err, 'error'));
     }
 
     if (cards.length === 0) {
-        toast('미리보기 생성 실패: 모든 템플릿에서 오류가 발생했습니다.', 'error');
+        toast('미리보기 생성 실패', 'error');
         return;
     }
 
+    $('#previewEmpty').style.display = 'none';
+    $('#liveIndicator').style.display = 'inline-flex';
     previewCards.innerHTML = cards.map(c => `
         <div class="preview-card">
             <div class="preview-card-header">
@@ -439,9 +604,7 @@ async function doPreview() {
             <pre>${esc(c.content)}</pre>
         </div>
     `).join('');
-    outputPreview.style.display = '';
-    outputPreview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    toast('미리보기 생성 (첫번째 코드 기준)', 'info');
+    toast('미리보기 생성 완료 (첫번째 코드 기준)', 'info');
 }
 
 async function doGenerate() {
@@ -469,12 +632,11 @@ async function doGenerate() {
             return;
         }
 
-        // Download blob
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         const disposition = res.headers.get('content-disposition') || '';
-        const match = disposition.match(/filename[^;=\n]*=(['\"]?)(.+?)\1(;|$)/);
+        const match = disposition.match(/filename[^;=\n]*=(['"]?)(.+?)\1(;|$)/);
         a.download = match ? decodeURIComponent(match[2]) : 'output.zip';
         a.href = url;
         document.body.appendChild(a);
@@ -483,14 +645,14 @@ async function doGenerate() {
         URL.revokeObjectURL(url);
 
         const total = state.uploadedData.data.length * state.selectedIds.size;
-        toast(`✅ ${total}개 파일 생성 완료!`, 'success');
+        toast(`${total}개 파일 생성 완료!`, 'success');
         setStatus('생성 완료');
     } catch (e) {
         toast('생성 중 오류 발생', 'error');
         setStatus('오류');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '🚀 파일 생성 & 다운로드';
+        btn.innerHTML = '파일 생성 & 다운로드';
         updateButtons();
     }
 }
@@ -499,9 +661,16 @@ async function doGenerate() {
 function setStatus(text) {
     const badge = $('#statusBadge');
     badge.textContent = text;
-    if (text.includes('오류')) { badge.style.color = 'var(--red)'; badge.style.borderColor = 'rgba(248,113,113,0.2)'; badge.style.background = 'rgba(248,113,113,0.12)'; }
-    else if (text.includes('완료') || text.includes('준비')) { badge.style.color = 'var(--green)'; badge.style.borderColor = 'rgba(52,211,153,0.2)'; badge.style.background = 'rgba(52,211,153,0.12)'; }
-    else { badge.style.color = 'var(--accent-bright)'; badge.style.borderColor = 'rgba(99,102,241,0.2)'; badge.style.background = 'rgba(99,102,241,0.12)'; }
+    if (text.includes('오류')) {
+        badge.style.color = 'var(--red)';
+        badge.style.background = 'var(--red-bg)';
+    } else if (text.includes('완료') || text.includes('준비')) {
+        badge.style.color = 'var(--green)';
+        badge.style.background = 'var(--green-bg)';
+    } else {
+        badge.style.color = 'var(--accent-light)';
+        badge.style.background = 'var(--accent-bg)';
+    }
 }
 
 function esc(s) {
