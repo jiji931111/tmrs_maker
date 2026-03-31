@@ -74,6 +74,19 @@ function bindEvents() {
     $('#saveTemplateBtn').addEventListener('click', saveTemplate);
     $('#useSameMatrix').addEventListener('change', () => renderMatrix());
 
+    // Filter
+    $('#tagFilter').addEventListener('input', () => renderTemplateTree());
+
+    // Global save shortcut (Ctrl+S)
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            if ($('#templateEditor').style.display !== 'none') {
+                e.preventDefault();
+                saveTemplate();
+            }
+        }
+    });
+
     // Folder toolbar
     $('#addFolderBtn').addEventListener('click', addNewFolder);
     $('#expandAllBtn').addEventListener('click', () => { state.collapsedFolders.clear(); renderTemplateTree(); });
@@ -86,7 +99,9 @@ function bindEvents() {
     $('#tmplFolderToggle').addEventListener('click', toggleFolderNewInput);
 
     // Template body - live preview on input
-    $('#tmplBody').addEventListener('input', () => scheduleLivePreview());
+    $('#tmplBody').addEventListener('input', () => {
+        scheduleLivePreview();
+    });
 
     // Template body - drag over support
     const tmplBody = $('#tmplBody');
@@ -106,11 +121,13 @@ function bindEvents() {
             const rect = tmplBody.getBoundingClientRect();
             // For textarea, we insert at the current cursor or end
             const pos = tmplBody.selectionStart || tmplBody.value.length;
+            const scrollPos = tmplBody.scrollTop;
             const before = tmplBody.value.substring(0, pos);
             const after = tmplBody.value.substring(pos);
             tmplBody.value = before + varCode + after;
             tmplBody.focus();
             tmplBody.selectionStart = tmplBody.selectionEnd = pos + varCode.length;
+            tmplBody.scrollTop = scrollPos;
             scheduleLivePreview();
         }
     });
@@ -186,6 +203,7 @@ function renderFilePatternChips() {
 }
 
 function insertAtCursor(textarea, text) {
+    const scrollPos = textarea.scrollTop;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const before = textarea.value.substring(0, start);
@@ -193,6 +211,7 @@ function insertAtCursor(textarea, text) {
     textarea.value = before + text + after;
     textarea.focus();
     textarea.selectionStart = textarea.selectionEnd = start + text.length;
+    textarea.scrollTop = scrollPos;
 }
 
 // ── Input Mode Switching ─────────────────────────────────────────
@@ -352,64 +371,168 @@ async function loadTemplates() {
 function getAllFolders() {
     const folders = new Set();
     state.templates.forEach(t => {
-        if (t.folder) folders.add(t.folder);
+        if (t.folder) {
+            // Add implicitly parent folders too
+            const parts = t.folder.split('/');
+            let current = '';
+            parts.forEach((p, i) => {
+                current += (i === 0 ? '' : '/') + p;
+                folders.add(current);
+            });
+        }
     });
+    if (window._emptyFolders) {
+        window._emptyFolders.forEach(f => {
+            const parts = f.split('/');
+            let current = '';
+            parts.forEach((p, i) => {
+                current += (i === 0 ? '' : '/') + p;
+                folders.add(current);
+            });
+        });
+    }
     return [...folders].sort();
 }
 
 function renderTemplateTree() {
-    const folders = getAllFolders();
-    const rootTemplates = state.templates.filter(t => !t.folder);
-    const grouped = {};
-    folders.forEach(f => { grouped[f] = []; });
-    state.templates.forEach(t => {
-        if (t.folder && grouped[t.folder]) grouped[t.folder].push(t);
+    // 1. Filter templates by tags if active
+    const filterInput = $('#tagFilter').value.trim().toLowerCase();
+    const filterTags = filterInput ? filterInput.split(',').map(s => s.trim()).filter(Boolean) : [];
+    
+    let visibleTemplates = state.templates;
+    if (filterTags.length > 0) {
+        visibleTemplates = state.templates.filter(t => {
+            if (!t.tags || t.tags.length === 0) return false;
+            return filterTags.some(ft => t.tags.some(tt => tt.toLowerCase().includes(ft)));
+        });
+    }
+
+    // 2. Build Tree Structure
+    const root = { files: [], children: {}, path: '', name: '루트' };
+    
+    // Ensure empty folders exist in tree
+    if (window._emptyFolders) {
+        window._emptyFolders.forEach(f => {
+            const parts = f.split('/');
+            let current = root;
+            let currentPath = '';
+            parts.forEach((part, i) => {
+                currentPath += (i === 0 ? '' : '/') + part;
+                if (!current.children[part]) {
+                    current.children[part] = { files: [], children: {}, path: currentPath, name: part };
+                }
+                current = current.children[part];
+            });
+        });
+    }
+
+    visibleTemplates.forEach(t => {
+        if (!t.folder) {
+            root.files.push(t);
+        } else {
+            const parts = t.folder.split('/');
+            let current = root;
+            let currentPath = '';
+            parts.forEach((part, i) => {
+                currentPath += (i === 0 ? '' : '/') + part;
+                if (!current.children[part]) {
+                    current.children[part] = { files: [], children: {}, path: currentPath, name: part };
+                }
+                current = current.children[part];
+            });
+            current.files.push(t);
+        }
     });
 
     let html = '';
 
-    // Render folders
-    folders.forEach(folderName => {
-        const items = grouped[folderName];
-        const isCollapsed = state.collapsedFolders.has(folderName);
-        const collapsedClass = isCollapsed ? 'collapsed' : '';
-        const selectedInFolder = items.filter(t => state.selectedIds.has(t.id)).length;
-        const countLabel = selectedInFolder > 0 ? `${selectedInFolder}/${items.length}` : `${items.length}`;
+    // Render function for nested nodes
+    function renderNode(node, level = 0) {
+        let nodeHtml = '';
+        const childNames = Object.keys(node.children).sort();
+        
+        childNames.forEach(childName => {
+            const childNode = node.children[childName];
+            const isCollapsed = state.collapsedFolders.has(childNode.path);
+            const collapsedClass = isCollapsed ? 'collapsed' : '';
+            
+            // Count total files recursively
+            let fileCount = 0;
+            let selectedCount = 0;
+            function count(n) {
+                fileCount += n.files.length;
+                selectedCount += n.files.filter(t => state.selectedIds.has(t.id)).length;
+                Object.values(n.children).forEach(count);
+            }
+            count(childNode);
+            
+            const countLabel = selectedCount > 0 ? `${selectedCount}/${fileCount}` : `${fileCount}`;
 
-        html += `
-        <div class="tree-folder ${collapsedClass}" data-folder="${esc(folderName)}">
-            <div class="tree-folder-header" data-folder="${esc(folderName)}">
-                <span class="tree-folder-toggle">▾</span>
-                <span class="tree-folder-icon">📁</span>
-                <span class="tree-folder-name">${esc(folderName)}</span>
-                <span class="tree-folder-count">${countLabel}</span>
-                <div class="tree-folder-actions">
-                    <button class="btn btn-xs btn-ghost" onclick="renameFolder('${esc(folderName)}')" title="이름 변경">✏️</button>
-                    <button class="btn btn-xs btn-ghost btn-danger" onclick="deleteFolder('${esc(folderName)}')" title="폴더 삭제">🗑</button>
+            nodeHtml += `
+            <div class="tree-folder ${collapsedClass}" data-folder="${esc(childNode.path)}">
+                <div class="tree-folder-header" data-folder="${esc(childNode.path)}" style="padding-left: ${8 + level * 14}px">
+                    <span class="tree-folder-toggle">▾</span>
+                    <input type="checkbox" class="folder-check" title="폴더 내 전체 선택" data-folder="${esc(childNode.path)}">
+                    <span class="tree-folder-icon">📁</span>
+                    <span class="tree-folder-name">${esc(childNode.name)}</span>
+                    <span class="tree-folder-count">${countLabel}</span>
+                    <div class="tree-folder-actions">
+                        <button class="btn btn-xs btn-ghost" onclick="renameFolder('${esc(childNode.path)}')" title="이름 변경">✏️</button>
+                        <button class="btn btn-xs btn-ghost btn-danger" onclick="deleteFolder('${esc(childNode.path)}')" title="폴더 삭제">🗑</button>
+                    </div>
                 </div>
-            </div>
-            <div class="tree-folder-children">
-                ${items.map(t => renderTemplateCard(t)).join('')}
-            </div>
-        </div>`;
-    });
+                <div class="tree-folder-children">
+                    ${renderNode(childNode, level + 1)}
+                </div>
+            </div>`;
+        });
 
-    // Root-level templates (no folder) + root drop zone
-    html += `<div class="tree-root-drop" data-folder="">
-        <div class="root-drop-label">📄 루트 (폴더 없음)</div>
-        <div class="tree-root-items">${rootTemplates.map(t => renderTemplateCard(t)).join('')}</div>
-    </div>`;
+        if (node.files.length > 0) {
+            nodeHtml += node.files.map(t => renderTemplateCard(t, level)).join('');
+        }
+        return nodeHtml;
+    }
+
+    // Render tree
+    html += renderNode(root, 0);
+
+    // If root drop zone isn't rendered inherently by files, add it explicitly
+    // to allow dropping outside of any folder.
+    if (root.files.length > 0 || Object.keys(root.children).length > 0) {
+        html += `<div class="tree-root-drop" data-folder="">
+            <div class="root-drop-label">📄 루트 (폴더 없음)</div>
+        </div>`;
+    }
 
     templateTree.innerHTML = html;
 
     // Bind folder toggle
     templateTree.querySelectorAll('.tree-folder-header').forEach(header => {
         header.addEventListener('click', (e) => {
-            if (e.target.closest('.tree-folder-actions')) return;
+            if (e.target.closest('.tree-folder-actions') || e.target.classList.contains('folder-check')) return;
             const folder = header.dataset.folder;
             if (state.collapsedFolders.has(folder)) state.collapsedFolders.delete(folder);
             else state.collapsedFolders.add(folder);
             renderTemplateTree();
+        });
+    });
+
+    // Bind folder select all
+    templateTree.querySelectorAll('.folder-check').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const folderPath = e.target.dataset.folder;
+            const isChecked = e.target.checked;
+            
+            // Find all templates that belong to this folder or its subfolders
+            const templatesToSelect = state.templates.filter(t => t.folder === folderPath || (t.folder && t.folder.startsWith(folderPath + '/')));
+            
+            templatesToSelect.forEach(t => {
+                if (isChecked) state.selectedIds.add(t.id);
+                else state.selectedIds.delete(t.id);
+            });
+            renderTemplateTree();
+            updateButtons();
+            scheduleLivePreview();
         });
     });
 
@@ -429,15 +552,18 @@ function renderTemplateTree() {
     bindTemplateDragDrop();
 }
 
-function renderTemplateCard(t) {
+function renderTemplateCard(t, level = 0) {
     const checked = state.selectedIds.has(t.id) ? 'checked' : '';
     const selClass = state.selectedIds.has(t.id) ? 'selected' : '';
+    const tagsHtml = (t.tags || []).map(tag => `<span class="tmpl-tag">${esc(tag)}</span>`).join('');
+    
     return `
-    <div class="tmpl-card ${selClass}" data-id="${t.id}" draggable="true">
+    <div class="tmpl-card ${selClass}" data-id="${t.id}" draggable="true" style="margin-left: ${level > 0 ? 16 : 0}px;">
         <div class="tmpl-drag-handle" title="드래그하여 폴더 이동">⠿</div>
         <input type="checkbox" class="tmpl-check" ${checked} data-id="${t.id}">
         <div class="tmpl-info">
-            <div class="tmpl-name">${esc(t.name)}</div>
+            <div class="tmpl-name-wrap"><span class="tmpl-name">${esc(t.name)}</span></div>
+            ${tagsHtml ? `<div class="tmpl-tags-list">${tagsHtml}</div>` : ''}
             <div class="tmpl-pattern">${esc(t.file_pattern)}</div>
         </div>
         <div class="tmpl-actions">
@@ -455,6 +581,7 @@ function openEditor(id) {
     $('#editorTitle').textContent = t ? `편집: ${t.name}` : '새 템플릿';
     $('#tmplName').value = t ? t.name : '';
     $('#tmplFilePattern').value = t ? t.file_pattern : 'TMRS%(code)s.asc';
+    $('#tmplTags').value = t && t.tags ? t.tags.join(', ') : '';
     $('#tmplBody').value = t ? t.body : '';
     $('#useSameMatrix').checked = t ? t.use_same_matrix !== false : true;
 
@@ -519,6 +646,8 @@ function collectEditorData() {
     const pattern = $('#tmplFilePattern').value.trim();
     const body = $('#tmplBody').value;
     const useSame = $('#useSameMatrix').checked;
+    const tagsRaw = $('#tmplTags').value;
+    const tags = tagsRaw.split(',').map(s => s.trim()).filter(Boolean);
 
     // Folder: use new input if in new-mode, else select
     let folder = '';
@@ -533,7 +662,7 @@ function collectEditorData() {
     if (!body) { toast('템플릿 내용을 입력하세요', 'error'); return null; }
 
     const matrix = state._editMatrix || defaultMatrix();
-    return { name, folder, file_pattern: pattern, body, use_same_matrix: useSame, matrix };
+    return { name, folder, tags, file_pattern: pattern, body, use_same_matrix: useSame, matrix };
 }
 
 async function saveTemplate() {
@@ -1079,14 +1208,8 @@ function toggleFolderNewInput() {
     }
 }
 
-// Override getAllFolders to include empty folders
+// Override getAllFolders to include implicit folders
 const _origGetAllFolders = getAllFolders;
 getAllFolders = function() {
-    const folders = _origGetAllFolders();
-    if (window._emptyFolders) {
-        window._emptyFolders.forEach(f => {
-            if (!folders.includes(f)) folders.push(f);
-        });
-    }
-    return folders.sort();
+    return _origGetAllFolders();
 };

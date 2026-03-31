@@ -100,9 +100,12 @@
                 </div>
                 <div class="card-body">
                     <div class="tmpl-toolbar">
-                        <button class="btn btn-ghost btn-sm" id="addFolderBtn" title="새 폴더 추가">📁 새 폴더</button>
+                        <button class="btn btn-ghost btn-sm" id="addFolderBtn" title="`/`를 사용해 하위 폴더도 생성 가능 (예: 그룹/서브)">📁 새 폴더</button>
                         <button class="btn btn-ghost btn-sm" id="expandAllBtn" title="모두 펼치기">▾ 모두 펼치기</button>
                         <button class="btn btn-ghost btn-sm" id="collapseAllBtn" title="모두 접기">▸ 모두 접기</button>
+                    </div>
+                    <div class="tmpl-filter-wrap">
+                        <input type="text" id="tagFilter" placeholder="🔍 태그 검색 (쉼표로 여러 태그 검색 가능)">
                     </div>
                     <div id="templateTree" class="template-tree"></div>
                     <button class="btn btn-outline btn-add" id="addTemplateBtn">
@@ -137,6 +140,10 @@
                                     <input type="text" id="tmplFilePattern" placeholder="TMRS%(code)s.asc">
                                     <div class="var-chips-inline" id="filePatternChips"></div>
                                 </div>
+                                <div class="form-group flex1">
+                                    <label>태그 (선택)</label>
+                                    <input type="text" id="tmplTags" placeholder="쉼표로 구분 (예: HBM, 테스트)">
+                                </div>
                             </div>
 
                             <!-- Variable Panel -->
@@ -152,7 +159,7 @@
 
                             <div class="form-group">
                                 <label>템플릿 내용</label>
-                                <textarea id="tmplBody" rows="8" spellcheck="false" placeholder="파일 내용을 입력하세요..."></textarea>
+                                <textarea id="tmplBody" rows="12" spellcheck="false" placeholder="파일 내용을 입력하세요..."></textarea>
                             </div>
 
                             <div class="matrix-section">

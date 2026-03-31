@@ -1,9 +1,16 @@
 {
   "templates": [
     {
-      "body": "여기는 풀 코드 자리 입니다 : %(filename_code)s\n여기는 TMRS 이름 입니다 : %(tmrs_name)s\n여기는 첫번째 자리 입니다. %(val1)s\n여기는 두번째 자리 입니다. %(val2)s\n여기는 세번째 자리 입니다. %(val3)s\n완료",
+      "name": "기본 템플릿",
+      "folder": "Group/Sub1",
+      "tags": [
+        "test",
+        "kjh",
+        "jjj"
+      ],
       "file_pattern": "TMRS%(code)s.asc",
-      "id": "default_1",
+      "body": "%(val1)s여기는 풀 코드 자리 입니다 : %(filename_code)s%(val2)s\n여기는 TMRS 이름 입니다 : %(tmrs_name)s\n여기는 첫번째 자리 입니\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n다. %(val1)s\n여기는 두번째 자리 입니다. %(val2)s\n여기는 세번째 자리 입니다. %(val3)s\n완료%(filename_code)s",
+      "use_same_matrix": true,
       "matrix": {
         "pos1": {
           "0": "0",
@@ -78,9 +85,7 @@
           "F": "F"
         }
       },
-      "name": "기본 템플릿",
-      "use_same_matrix": true,
-      "folder": "HBM3"
+      "id": "default_1"
     },
     {
       "body": "여기는 풀 코드 자리 입니다 : %(filename_code)s\n여기는 TMRS 이름 입니다 : %(tmrs_name)s\n여기는 첫번째 자리 입니다. %(val1)s\n여기는 두번째 자리 입니다. %(val2)s\n여기는 세번째 자리 입니다. %(val3)s\n완료",
