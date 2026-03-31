@@ -363,6 +363,7 @@ textarea { resize: vertical; line-height: 1.7; }
 }
 .toast-success { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
 .toast-error { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+.toast-warning { background: rgba(251,191,36,0.15); color: var(--orange); border: 1px solid rgba(251,191,36,0.2); }
 .toast-info { background: rgba(99,102,241,0.15); color: var(--accent-bright); border: 1px solid rgba(99,102,241,0.2); }
 @keyframes toastIn { from { opacity:0; transform:translateX(20px); } }
 @keyframes toastOut { to { opacity:0; transform:translateX(20px); } }

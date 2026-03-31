@@ -234,5 +234,9 @@ def generate():
 
 
 if __name__ == '__main__':
+    import webbrowser
+    import threading
+
     print("🚀 TMRS Pattern Maker: http://localhost:5000")
+    threading.Timer(1.5, lambda: webbrowser.open('http://localhost:5000')).start()
     app.run(debug=True, port=5000, host='0.0.0.0')

@@ -96,6 +96,7 @@ function handlePaste() {
 
     const lines = raw.split(/\r?\n/).filter(l => l.trim());
     const data = [];
+    const skipped = [];
     const isHex = s => s && s.length === 3 && /^[0-9A-Fa-f]{3}$/.test(s);
 
     for (const line of lines) {
@@ -104,18 +105,32 @@ function handlePaste() {
         let code = (parts[0] || '').trim();
         const name = (parts[1] || '').trim();
 
+        // Handle decimal numbers from Excel (e.g., "1.0" → "1", "10.0" → "10")
+        if (code && /^\d+\.\d*$/.test(code)) {
+            code = code.split('.')[0];
+        }
+
         // Pad short hex codes
         if (code && code.length < 3 && /^[0-9A-Fa-f]+$/.test(code)) {
             code = code.padStart(3, '0');
         }
         if (isHex(code)) {
             data.push({ code: code.toUpperCase(), name });
+        } else if (code) {
+            skipped.push(code);
         }
     }
 
     if (data.length === 0) {
-        toast('유효한 HEX 코드를 찾지 못했습니다. A열: 3자리 HEX, B열: 이름 형태로 붙여넣어주세요.', 'error');
+        const reason = skipped.length > 0
+            ? `유효한 HEX 코드를 찾지 못했습니다. 건너뛴 값: ${skipped.slice(0, 5).join(', ')}${skipped.length > 5 ? '...' : ''}`
+            : '유효한 HEX 코드를 찾지 못했습니다. A열: 3자리 HEX, B열: 이름 형태로 붙여넣어주세요.';
+        toast(reason, 'error');
         return;
+    }
+
+    if (skipped.length > 0) {
+        toast(`${skipped.length}개 항목이 유효하지 않아 건너뜀: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '...' : ''}`, 'warning');
     }
 
     state.uploadedData = {
@@ -144,8 +159,10 @@ function toast(msg, type = 'info') {
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
     el.textContent = msg;
+    const duration = (type === 'error' || type === 'warning') ? 5000 : 3000;
+    el.style.animation = `toastIn 0.3s ease, toastOut 0.3s ease ${duration - 300}ms forwards`;
     toastContainer.appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+    setTimeout(() => el.remove(), duration);
 }
 
 // ── Upload ───────────────────────────────────────────────────────
@@ -372,11 +389,20 @@ async function doPreview() {
     if (!state.uploadedData || state.selectedIds.size === 0) return;
 
     const first = state.uploadedData.data[0];
+    if (!first) {
+        toast('미리보기할 데이터가 없습니다. 데이터를 다시 입력해주세요.', 'error');
+        return;
+    }
+
     const cards = [];
+    const errors = [];
 
     for (const tid of state.selectedIds) {
         const tmpl = state.templates.find(t => t.id === tid);
-        if (!tmpl) continue;
+        if (!tmpl) {
+            errors.push(`템플릿 ID '${tid}'를 찾을 수 없습니다 (삭제/변경됨)`);
+            continue;
+        }
         try {
             const res = await fetch('/api/preview', {
                 method: 'POST',
@@ -384,11 +410,25 @@ async function doPreview() {
                 body: JSON.stringify({ code_item: first, template: tmpl })
             });
             const json = await res.json();
+            if (!res.ok) {
+                errors.push(`[${tmpl.name}] ${json.error || '서버 오류'}`);
+                continue;
+            }
             cards.push({ tmplName: tmpl.name, filename: json.filename, content: json.content });
-        } catch (e) { /* skip */ }
+        } catch (e) {
+            errors.push(`[${tmpl.name}] 네트워크 오류: ${e.message}`);
+        }
     }
 
-    if (cards.length === 0) { toast('미리보기 생성 실패', 'error'); return; }
+    // Show errors if any
+    if (errors.length > 0) {
+        errors.forEach(err => toast(err, 'error'));
+    }
+
+    if (cards.length === 0) {
+        toast('미리보기 생성 실패: 모든 템플릿에서 오류가 발생했습니다.', 'error');
+        return;
+    }
 
     previewCards.innerHTML = cards.map(c => `
         <div class="preview-card">
