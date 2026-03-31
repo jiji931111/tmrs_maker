@@ -955,6 +955,7 @@ async function doGenerate() {
     const inputName = $('#inputNameField').value.trim() || 
         (state.uploadedData.filename === 'pasted_data' ? 'output' : state.uploadedData.filename);
     
+    const tmrsListEnabled = $('#enableTmrsList').checked;
     const tmrsListCfg = {
         enabled: tmrsListEnabled,
         filename: $('#tmrsListFileName').value.trim() || 'TMRS_LIST.asc',
