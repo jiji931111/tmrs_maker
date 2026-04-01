@@ -14,6 +14,19 @@ CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config')
 TEMPLATES_FILE = os.path.join(CONFIG_DIR, 'templates.json')
 HEX_DIGITS = [str(i) for i in range(10)] + list('ABCDEF')
 
+import jinja2
+
+def _hex2dec(v):
+    try:
+        return int(str(v), 16)
+    except (ValueError, TypeError):
+        return 0
+
+JINJA_ENV = jinja2.Environment()
+JINJA_ENV.globals['hex2dec'] = _hex2dec
+JINJA_ENV.globals['int'] = int
+JINJA_ENV.globals['str'] = str
+
 
 # ── Template helpers ──────────────────────────────────────────────
 def _identity_matrix():
@@ -85,6 +98,13 @@ def apply_template(tmpl, code, name):
         ph = f'%({k})s'
         body = body.replace(ph, str(v))
         fname = fname.replace(ph, str(v))
+        
+    try:
+        body = JINJA_ENV.from_string(body).render(**reps)
+        fname = JINJA_ENV.from_string(fname).render(**reps)
+    except Exception as e:
+        print(f"Jinja render error in apply_template: {e}")
+        
     return fname, body
 
 
@@ -248,7 +268,9 @@ def generate_tmrs_list_content(header, body_fmt, tmpl, codes):
             'dir': tmpl.get('dir', '')
         }
         try:
-            res.append(body_fmt % data)
+            line = body_fmt % data
+            line = JINJA_ENV.from_string(line).render(**data)
+            res.append(line)
         except Exception as e:
             res.append(f"[Line formatting error row {i}]: {str(e)}")
             
