@@ -356,6 +356,27 @@
 
     <div class="toast-container" id="toastContainer"></div>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Auto-resize textareas so manual drag isn't needed
+        function updateTextareaHeight(el) {
+            if (el.tagName.toLowerCase() !== 'textarea') return;
+            el.style.height = 'auto';
+            el.style.height = Math.max(el.scrollHeight, 60) + 'px';
+        }
+        document.addEventListener('input', e => updateTextareaHeight(e.target));
+        
+        // Initial setup for any visible pre-filled textareas
+        setTimeout(() => {
+            document.querySelectorAll('textarea').forEach(updateTextareaHeight);
+        }, 300);
+        
+        // Re-calculate heights when sections are shown/toggled 
+        document.addEventListener('click', () => {
+             setTimeout(() => {
+                 document.querySelectorAll('textarea').forEach(updateTextareaHeight);
+             }, 50);
+        });
+    </script>
 </body>
 
 </html>
