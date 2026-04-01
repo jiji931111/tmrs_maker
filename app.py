@@ -6,14 +6,6 @@ import uuid
 import zipfile
 from flask import Flask, render_template, request, jsonify, send_file
 import openpyxl
-
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
-
-CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config')
-TEMPLATES_FILE = os.path.join(CONFIG_DIR, 'templates.json')
-HEX_DIGITS = [str(i) for i in range(10)] + list('ABCDEF')
-
 import jinja2
 
 def _hex2dec(v):
@@ -26,6 +18,13 @@ JINJA_ENV = jinja2.Environment()
 JINJA_ENV.globals['hex2dec'] = _hex2dec
 JINJA_ENV.globals['int'] = int
 JINJA_ENV.globals['str'] = str
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config')
+TEMPLATES_FILE = os.path.join(CONFIG_DIR, 'templates.json')
+HEX_DIGITS = [str(i) for i in range(10)] + list('ABCDEF')
 
 
 # ── Template helpers ──────────────────────────────────────────────
@@ -98,13 +97,16 @@ def apply_template(tmpl, code, name):
         ph = f'%({k})s'
         body = body.replace(ph, str(v))
         fname = fname.replace(ph, str(v))
-        
+
     try:
         body = JINJA_ENV.from_string(body).render(**reps)
+    except Exception:
+        pass
+    try:
         fname = JINJA_ENV.from_string(fname).render(**reps)
-    except Exception as e:
-        print(f"Jinja render error in apply_template: {e}")
-        
+    except Exception:
+        pass
+
     return fname, body
 
 
@@ -269,7 +271,10 @@ def generate_tmrs_list_content(header, body_fmt, tmpl, codes):
         }
         try:
             line = body_fmt % data
-            line = JINJA_ENV.from_string(line).render(**data)
+            try:
+                line = JINJA_ENV.from_string(line).render(**data)
+            except Exception:
+                pass
             res.append(line)
         except Exception as e:
             res.append(f"[Line formatting error row {i}]: {str(e)}")

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,10 +8,13 @@
     <meta name="description" content="반도체 테스트 장비용 TMRS 패턴 파일 생성 도구">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style> :root { color-scheme: dark; } </style>
 </head>
+
 <body>
     <header class="app-header">
         <div class="header-content">
@@ -80,7 +84,13 @@
                         <h3>데이터 미리보기 <small id="previewHint"></small></h3>
                         <div class="table-wrap">
                             <table>
-                                <thead><tr><th>#</th><th>HEX</th><th>이름</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>HEX</th>
+                                        <th>이름</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="previewBody"></tbody>
                             </table>
                         </div>
@@ -101,10 +111,12 @@
                 </div>
                 <div class="card-body">
                     <div class="tmpl-toolbar">
-                        <button class="btn btn-ghost btn-sm" id="addFolderBtn" title="`/`를 사용해 하위 폴더도 생성 가능 (예: 그룹/서브)">📁 새 폴더</button>
+                        <button class="btn btn-ghost btn-sm" id="addFolderBtn"
+                            title="`/`를 사용해 하위 폴더도 생성 가능 (예: 그룹/서브)">📁 새 폴더</button>
                         <button class="btn btn-ghost btn-sm" id="expandAllBtn" title="모두 펼치기">▾ 모두 펼치기</button>
                         <button class="btn btn-ghost btn-sm" id="collapseAllBtn" title="모두 접기">▸ 모두 접기</button>
-                        <button class="btn btn-ghost btn-sm" id="toggleSelectAllBtn" title="전체 선택/해제">☑️ 전체 선택/해제</button>
+                        <button class="btn btn-ghost btn-sm" id="toggleSelectAllBtn" title="전체 선택/해제">☑️ 전체
+                            선택/해제</button>
                     </div>
                     <div class="tmpl-filter-wrap">
                         <input type="text" id="tagFilter" placeholder="🔍 태그 검색 (쉼표로 여러 태그 검색 가능)">
@@ -131,14 +143,17 @@
                                         <select id="tmplFolder" class="folder-select">
                                             <option value="">(루트)</option>
                                         </select>
-                                        <input type="text" id="tmplFolderNew" class="folder-new-input" placeholder="새 폴더 이름" style="display:none">
-                                        <button class="btn btn-xs btn-ghost" id="tmplFolderToggle" title="새 폴더 직접 입력">✚</button>
+                                        <input type="text" id="tmplFolderNew" class="folder-new-input"
+                                            placeholder="새 폴더 이름" style="display:none">
+                                        <button class="btn btn-xs btn-ghost" id="tmplFolderToggle"
+                                            title="새 폴더 직접 입력">✚</button>
                                     </div>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>출력 파일명 패턴 (예: TMRS%(code)s.asc)</label>
-                                <input type="text" id="tmplFilePattern" placeholder="예: TMRS%(code)s.asc" spellcheck="false">
+                                <input type="text" id="tmplFilePattern" placeholder="예: TMRS%(code)s.asc"
+                                    spellcheck="false">
                             </div>
                             <div class="form-row">
                                 <div class="var-chips-inline" id="filePatternChips"></div>
@@ -164,7 +179,8 @@
                                     <span>템플릿 내용</span>
                                     <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
                                 </label>
-                                <textarea id="tmplBody" rows="12" spellcheck="false" placeholder="파일 내용을 입력하세요..."></textarea>
+                                <textarea id="tmplBody" rows="12" spellcheck="false"
+                                    placeholder="파일 내용을 입력하세요..."></textarea>
                             </div>
 
                             <div class="matrix-section">
@@ -222,12 +238,15 @@
                             <input type="checkbox" id="enableTmrsList">
                             <span class="toggle-track"><span class="toggle-knob"></span></span>
                             <span style="font-weight: 500;">추가 파일 1 생성 [공통 1개]</span>
-                            <span class="badge" style="margin-left: 8px; font-size: 10px; opacity: 0.7;">압축파일 루트에 생성</span>
+                            <span class="badge" style="margin-left: 8px; font-size: 10px; opacity: 0.7;">압축파일 루트에
+                                생성</span>
                         </label>
-                        <div id="tmrsListPanel" style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+                        <div id="tmrsListPanel"
+                            style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
                             <div class="form-group" style="margin-bottom: 10px;">
                                 <label>파일명 (확장자 포함)</label>
-                                <input type="text" id="tmrsListFileName" placeholder="예: TMRS_LIST.asc" value="TMRS_LIST.asc" spellcheck="false">
+                                <input type="text" id="tmrsListFileName" placeholder="예: TMRS_LIST.asc"
+                                    value="TMRS_LIST.asc" spellcheck="false">
                             </div>
                             <div class="form-group" style="margin-bottom: 10px;">
                                 <label>머릿말 (선택, 최상단 1회 출력)</label>
@@ -238,8 +257,10 @@
                                     <span>반복 항목 포맷 (인풋 줄마다 출력)</span>
                                     <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
                                 </label>
-                                <textarea id="tmrsListBody" rows="3" placeholder='IF TMRS=%(seq)s THEN WRITE "%(tmrs_name)s"'></textarea>
-                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(seq)s</code>, <code>%(code)s</code>, <code>%(val1)s</code>, <code>%(tmrs_name)s</code> 등</div>
+                                <textarea id="tmrsListBody" rows="3"
+                                    placeholder='IF TMRS=%(seq)s THEN WRITE "%(tmrs_name)s"'></textarea>
+                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(seq)s</code>,
+                                    <code>%(code)s</code>, <code>%(val1)s</code>, <code>%(tmrs_name)s</code> 등</div>
                             </div>
                         </div>
                     </div>
@@ -250,16 +271,20 @@
                             <input type="checkbox" id="enableTmrsList2">
                             <span class="toggle-track"><span class="toggle-knob"></span></span>
                             <span style="font-weight: 500;">추가 파일 2 생성 [개별 생성]</span>
-                            <span class="badge" style="margin-left: 8px; font-size: 10px; opacity: 0.7;">각 템플릿 폴더마다 생성</span>
+                            <span class="badge" style="margin-left: 8px; font-size: 10px; opacity: 0.7;">각 템플릿 폴더마다
+                                생성</span>
                         </label>
-                        <div id="tmrsListPanel2" style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
+                        <div id="tmrsListPanel2"
+                            style="display: none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px; border: 1px solid var(--border);">
                             <div class="form-group" style="margin-bottom: 10px;">
                                 <label>파일명 (확장자 포함)</label>
-                                <input type="text" id="tmrsListFileName2" placeholder="예: TMRS_DIR.asc" value="TMRS_DIR.asc" spellcheck="false">
+                                <input type="text" id="tmrsListFileName2" placeholder="예: TMRS_DIR.asc"
+                                    value="TMRS_DIR.asc" spellcheck="false">
                             </div>
                             <div class="form-group" style="margin-bottom: 10px;">
                                 <label>머릿말 (선택, 최상단 1회 출력)</label>
-                                <textarea id="tmrsListHeader2" rows="2" placeholder="예: TMRS DIR LIST BEGIN..."></textarea>
+                                <textarea id="tmrsListHeader2" rows="2"
+                                    placeholder="예: TMRS DIR LIST BEGIN..."></textarea>
                             </div>
                             <div class="form-group">
                                 <label style="display:flex; justify-content:space-between; align-items:center;">
@@ -267,11 +292,14 @@
                                     <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
                                 </label>
                                 <textarea id="tmrsListBody2" rows="3" placeholder='%(dir)s/%(code)s.asc'></textarea>
-                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(dir)s</code>(입력한 경로), <code>%(code)s</code>, <code>%(seq)s</code> 등</div>
+                                <div class="hint" style="margin-top:4px;">사용 가능: <code>%(dir)s</code>(입력한 경로),
+                                    <code>%(code)s</code>, <code>%(seq)s</code> 등</div>
                             </div>
-                            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
+                            <div class="form-group"
+                                style="border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
                                 <label style="font-size: 11px; color: var(--accent-light);">템플릿별 경로 설정 (실행 시 입력)</label>
-                                <div id="tmrsListPathsContainer" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                                <div id="tmrsListPathsContainer"
+                                    style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
                                     <!-- Dynamic path inputs go here -->
                                 </div>
                             </div>
@@ -298,6 +326,7 @@
                 <button class="btn btn-xs btn-ghost" onclick="document.getElementById('helpModal').style.display='none'">✕</button>
             </div>
             <div class="modal-body user-guide">
+{% raw %}
                 <h4>1. 기본 변수 텍스트 매핑</h4>
                 <p><code>%(변수명)s</code> 형태로 사용합니다. (예: <code>%(tmrs_name)s</code>, <code>%(code)s</code>)</p>
                 
@@ -320,6 +349,7 @@
                     <strong>실전 예시 (복사해서 테스트해보세요):</strong><br><br>
                     <code>NAME: [%(tmrs_name)-20s] | CODE: %(code)s | VAL: {{ hex2dec(ori1) + 150 }}</code>
                 </div>
+{% endraw %}
             </div>
         </div>
     </div>
@@ -327,4 +357,5 @@
     <div class="toast-container" id="toastContainer"></div>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
+
 </html>
