@@ -177,7 +177,10 @@
                             <div class="form-group">
                                 <label style="display:flex; justify-content:space-between; align-items:center;">
                                     <span>템플릿 내용</span>
-                                    <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
+                                    <div>
+                                        <span class="help-btn" onclick="openExpandModal('tmplBody', '템플릿 내용')">⛶ 크게 편집</span>
+                                        <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
+                                    </div>
                                 </label>
                                 <textarea id="tmplBody" rows="12" spellcheck="false"
                                     placeholder="파일 내용을 입력하세요..."></textarea>
@@ -249,13 +252,19 @@
                                     value="TMRS_LIST.asc" spellcheck="false">
                             </div>
                             <div class="form-group" style="margin-bottom: 10px;">
-                                <label>머릿말 (선택, 최상단 1회 출력)</label>
+                                <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+                                    <span>머릿말 (선택, 최상단 1회 출력)</span>
+                                    <span class="help-btn" onclick="openExpandModal('tmrsListHeader', '추가 파일 1 - 머릿말')">⛶ 크게 편집</span>
+                                </label>
                                 <textarea id="tmrsListHeader" rows="2" placeholder="예: TMRS LIST BEGIN..."></textarea>
                             </div>
                             <div class="form-group">
                                 <label style="display:flex; justify-content:space-between; align-items:center;">
                                     <span>반복 항목 포맷 (인풋 줄마다 출력)</span>
-                                    <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
+                                    <div>
+                                        <span class="help-btn" onclick="openExpandModal('tmrsListBody', '추가 파일 1 - 항목 포맷')">⛶ 크게 편집</span>
+                                        <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
+                                    </div>
                                 </label>
                                 <textarea id="tmrsListBody" rows="3"
                                     placeholder='IF TMRS=%(seq)s THEN WRITE "%(tmrs_name)s"'></textarea>
@@ -282,14 +291,20 @@
                                     value="TMRS_DIR.asc" spellcheck="false">
                             </div>
                             <div class="form-group" style="margin-bottom: 10px;">
-                                <label>머릿말 (선택, 최상단 1회 출력)</label>
+                                <label style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+                                    <span>머릿말 (선택, 최상단 1회 출력)</span>
+                                    <span class="help-btn" onclick="openExpandModal('tmrsListHeader2', '추가 파일 2 - 머릿말')">⛶ 크게 편집</span>
+                                </label>
                                 <textarea id="tmrsListHeader2" rows="2"
                                     placeholder="예: TMRS DIR LIST BEGIN..."></textarea>
                             </div>
                             <div class="form-group">
                                 <label style="display:flex; justify-content:space-between; align-items:center;">
                                     <span>반복 항목 포맷 (인풋 줄마다 출력)</span>
-                                    <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
+                                    <div>
+                                        <span class="help-btn" onclick="openExpandModal('tmrsListBody2', '추가 파일 2 - 항목 포맷')">⛶ 크게 편집</span>
+                                        <span class="help-btn" onclick="document.getElementById('helpModal').style.display='flex'">❓ 문법 & 연산 도움말</span>
+                                    </div>
                                 </label>
                                 <textarea id="tmrsListBody2" rows="3" placeholder='%(dir)s/%(code)s.asc'></textarea>
                                 <div class="hint" style="margin-top:4px;">사용 가능: <code>%(dir)s</code>(입력한 경로),
@@ -317,6 +332,26 @@
             </section>
         </div>
     </main>
+
+    <!-- Expand Editor Modal -->
+    <div class="modal-overlay" id="expandModal" style="display:none" onclick="if(event.target===this) closeExpandModal()">
+        <div class="modal-content" style="max-width: 90vw; width: 1000px; height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 id="expandModalTitle">📝 큰 화면에서 편집하기</h3>
+                <button class="btn btn-xs btn-ghost" onclick="closeExpandModal()">✕</button>
+            </div>
+            <div class="modal-body" style="flex: 1; display: flex; flex-direction: column; padding: 0;">
+                <textarea id="expandModalTextarea" style="flex: 1; width: 100%; border: none; border-radius: 0; padding: 20px; font-size: 13px; resize: none; white-space: pre; overflow: auto; background: var(--bg-input); color: var(--text-1); font-family: var(--mono); outline: none;" spellcheck="false"></textarea>
+            </div>
+            <div class="editor-actions" style="padding: 16px; border-top: 1px solid var(--border); margin: 0; display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); border-radius: 0 0 var(--radius) var(--radius);">
+                <span style="color: var(--text-3); font-size: 11px;">💡 줄바꿈 없이 가로로 넓게 볼 수 있습니다. (Ctrl+S 적용)</span>
+                <div>
+                    <button class="btn btn-ghost" onclick="closeExpandModal()">취소</button>
+                    <button class="btn btn-primary" onclick="saveExpandModal()" style="margin-left:8px;">적용하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Help Modal -->
     <div class="modal-overlay" id="helpModal" style="display:none" onclick="if(event.target===this) this.style.display='none'">
@@ -373,8 +408,36 @@
         // Re-calculate heights when sections are shown/toggled 
         document.addEventListener('click', () => {
              setTimeout(() => {
-                 document.querySelectorAll('textarea').forEach(updateTextareaHeight);
+                 document.querySelectorAll('textarea:not(#expandModalTextarea)').forEach(updateTextareaHeight);
              }, 50);
+        });
+
+        // Expand Editor Modal logic
+        let activeExpandTarget = null;
+        function openExpandModal(targetId, title) {
+            activeExpandTarget = document.getElementById(targetId);
+            document.getElementById('expandModalTitle').innerText = '⛶ 크게 편집 - ' + title;
+            document.getElementById('expandModalTextarea').value = activeExpandTarget.value;
+            document.getElementById('expandModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('expandModalTextarea').focus(), 10);
+        }
+        function closeExpandModal() {
+            document.getElementById('expandModal').style.display = 'none';
+            activeExpandTarget = null;
+        }
+        function saveExpandModal() {
+            if (activeExpandTarget) {
+                activeExpandTarget.value = document.getElementById('expandModalTextarea').value;
+                updateTextareaHeight(activeExpandTarget);
+                activeExpandTarget.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            closeExpandModal();
+        }
+        document.getElementById('expandModalTextarea').addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveExpandModal();
+            }
         });
     </script>
 </body>
